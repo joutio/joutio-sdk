@@ -1,0 +1,28 @@
+# Défauts du profil `prod`, importés par les services via
+# `spring.config.import: optional:classpath:joutio-prod.yml` (depuis application-prod.yml).
+#
+# Priorité : un fichier importé est **moins prioritaire** que le fichier qui l'importe
+# et que les variables d'environnement. Chaque service peut donc surcharger ces valeurs.
+#
+# ⚠️ Aucun secret ici : les valeurs sensibles proviennent des variables d'environnement
+# injectées par les ConfigMaps/SealedSecrets GitOps.
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${JOUTIO_DB_HOST:postgres}:${JOUTIO_DB_PORT:5432}/${JOUTIO_DB_NAME}
+    username: ${JOUTIO_DB_USERNAME}
+    password: ${JOUTIO_DB_PASSWORD}
+
+  kafka:
+    bootstrap-servers: ${JOUTIO_KAFKA_HOST:kafka}:${JOUTIO_KAFKA_PORT:9092}
+
+microservice:
+  resource-server:
+    jwt:
+      # JWKS in-cluster (pas de hairpin NAT) ; l'issuer public reste `JOUTIO_IDENTITY_ISSUER`.
+      issuer-uri: ${JOUTIO_AUTH_SERVER_URL:http://joutio-identity.joutio-prod.svc.cluster.local}
+      jwk-set-uri: ${JOUTIO_AUTH_SERVER_JWKS_URL:http://joutio-identity.joutio-prod.svc.cluster.local/oauth2/jwks}
+  swagger:
+    oauth2:
+      # URL PUBLIQUE consommée par le navigateur (le gateway agrège les docs).
+      authorization-server-url: ${MICROSERVICE_SWAGGER_OAUTH2_AUTHORIZATION_SERVER_URL:https://identity.joutio.cnadjim.fr}

@@ -1,0 +1,52 @@
+package com.joutio.microservice.core.infrastructure.adapter;
+
+import com.joutio.microservice.core.infrastructure.in.api.request.FilterRequest;
+import com.joutio.microservice.core.infrastructure.in.api.request.SearchRequest;
+import com.joutio.microservice.core.domain.model.search.SearchableEntity;
+import com.joutio.microservice.core.domain.model.search.SearchableField;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
+
+/**
+ * Convertit un {@link SearchRequest} en {@link Specification} JPA
+ * en utilisant le {@link SearchableEntity} pour la résolution des champs
+ * et le registry de {@link PredicateBuilder} pour la construction des prédicats.
+ */
+public class SearchRequestSpecification<T> implements Specification<T> {
+
+    private final SearchRequest criteria;
+    private final SearchableEntity searchableEntity;
+
+    public SearchRequestSpecification(SearchRequest criteria, SearchableEntity searchableEntity) {
+        this.criteria = criteria;
+        this.searchableEntity = searchableEntity;
+    }
+
+    @Nullable
+    @Override
+    public Predicate toPredicate(@NonNull Root<T> root, @Nullable CriteriaQuery<?> query, @NonNull CriteriaBuilder criteriaBuilder) {
+        Predicate predicate = criteriaBuilder.conjunction();
+
+        if (criteria.filters() == null || criteria.filters().isEmpty()) {
+            return predicate;
+        }
+
+        for (FilterRequest filter : criteria.filters()) {
+
+            SearchableField field = searchableEntity.getByKey(filter.property());
+
+            PredicateBuilder builder = PredicateBuilder.REGISTRY.get(filter.operator());
+
+            if (builder != null) {
+                predicate = builder.build(root, criteriaBuilder, predicate, field, filter);
+            }
+        }
+
+        return predicate;
+    }
+}

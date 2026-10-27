@@ -1,0 +1,85 @@
+package com.joutio.axon.autoconfigure;
+
+import org.axonframework.extensions.kafka.KafkaProperties;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.env.EnvironmentPostProcessor;
+import org.springframework.core.Ordered;
+import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.MutablePropertySources;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+
+public class AxonDistributedEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
+
+    private static final String PROPERTY_SOURCE_NAME = "axonDistributedDefaultProperties";
+    private static final String DISABLE_AXONIQ_CONSOLE_MESSAGE = "disable-axoniq-console-message";
+
+    @Override
+    public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
+
+        // AxonIQConsoleModule (Axon) lit uniquement la propriété système JVM, pas une propriété Spring :
+        // la poser ici supprime le bandeau « AxonIQ Console » pour tous les services. On respecte une
+        // valeur déjà définie (permet de le réactiver via -Ddisable-axoniq-console-message=false).
+        if (System.getProperty(DISABLE_AXONIQ_CONSOLE_MESSAGE) == null) {
+            System.setProperty(DISABLE_AXONIQ_CONSOLE_MESSAGE, Boolean.TRUE.toString());
+        }
+
+        String applicationName = environment.getProperty("spring.application.name", "axon-distributed-application");
+
+        Map<String, Object> defaultProperties = new LinkedHashMap<>();
+
+        defaultProperties.put("axon.axonserver.enabled", false);
+        defaultProperties.put("axon.serializer.general", "jackson");
+        defaultProperties.put("axon.serializer.messages", "jackson");
+        defaultProperties.put("axon.serializer.event", "jackson");
+        defaultProperties.put("axon.update-check.disabled", true);
+
+        defaultProperties.put("axon.distributed.enabled", true);
+        defaultProperties.put("axon.distributed.spring-cloud.enabled", true);
+        defaultProperties.put("axon.distributed.spring-cloud.mode", "rest");
+        defaultProperties.put("axon.distributed.load-factor", 100);
+        defaultProperties.put("axon.distributed.spring-cloud.enable-ignore-listing", true);
+        defaultProperties.put("axon.distributed.spring-cloud.enable-accept-all-commands", false);
+        defaultProperties.put("axon.distributed.spring-cloud.rest-mode-url", "/command-capabilities");
+
+        defaultProperties.put("axon.kafka.enabled", true);
+        defaultProperties.put("axon.kafka.default-topic", KafkaProperties.DEFAULT_TOPIC);
+        defaultProperties.put("axon.kafka.client-id", applicationName);
+
+        // Les processing groups sont déclarés explicitement (@ProcessingGroup) ; la source
+        // par défaut (Kafka streamable) est câblée par AxonDistributedKafkaAutoConfiguration.
+        // Ne pas déduire de groupe ici : cela empêcherait les replays ciblés.
+        defaultProperties.put("axon.kafka.producer.event-processor-mode", "tracking");
+        defaultProperties.put("axon.kafka.consumer.event-processor-mode", "tracking");
+
+        defaultProperties.put("axon.kafka.consumer.auto-offset-reset", "earliest");
+
+        // Découverte des pairs. Désactivée par défaut : en local on utilise
+        // spring.cloud.discovery.client.simple.instances (URLs), en prod on active le
+        // DiscoveryClient Kubernetes (SPRING_CLOUD_KUBERNETES_DISCOVERY_ENABLED=true).
+        defaultProperties.put("spring.cloud.kubernetes.discovery.enabled", false);
+        // Ne découvre que les services participant au bus Axon (label app.kubernetes.io/component=axon).
+        defaultProperties.put("spring.cloud.kubernetes.discovery.filter",
+                "#root.metadata.labels?.get('app.kubernetes.io/component') == 'axon'");
+        // Inclure les endpoints non-`Ready` : sinon, pendant le démarrage, le pod local n'apparaît
+        // pas dans les Endpoints, et un HeartbeatEvent reconstruit le ConsistentHash SANS le membre
+        // local -> les commandes locales échouent en `No node known to accept command` (seeders,
+        // sagas). Le fallback Registration porte l'IP du pod pour être reconnu comme local.
+        defaultProperties.put("spring.cloud.kubernetes.discovery.include-not-ready-addresses", true);
+
+        MutablePropertySources propertySources = environment.getPropertySources();
+
+        if (propertySources.contains(PROPERTY_SOURCE_NAME)) {
+            propertySources.remove(PROPERTY_SOURCE_NAME);
+        }
+        propertySources.addLast(new MapPropertySource(PROPERTY_SOURCE_NAME, defaultProperties));
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.LOWEST_PRECEDENCE - 10;
+    }
+}

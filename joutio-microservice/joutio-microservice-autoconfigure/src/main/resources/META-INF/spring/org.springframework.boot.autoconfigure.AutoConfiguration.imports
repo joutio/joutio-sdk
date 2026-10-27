@@ -1,0 +1,11 @@
+com.joutio.microservice.autoconfigure.MicroserviceAutoConfiguration
+com.joutio.microservice.autoconfigure.ExceptionAutoConfiguration
+com.joutio.microservice.autoconfigure.CorsAutoConfiguration
+com.joutio.microservice.autoconfigure.SwaggerAutoConfiguration
+com.joutio.microservice.autoconfigure.ActuatorAutoConfiguration
+com.joutio.microservice.autoconfigure.ObservabilityAutoConfiguration
+com.joutio.microservice.autoconfigure.ResourceServerAutoConfiguration
+com.joutio.microservice.autoconfigure.PasswordEncoderAutoConfiguration
+com.joutio.microservice.autoconfigure.WebSocketAutoConfiguration
+com.joutio.microservice.autoconfigure.SwaggerRootRedirectAutoConfiguration
+

@@ -1,0 +1,130 @@
+package com.joutio.microservice.exception;
+
+import com.joutio.microservice.MicroserviceProperties;
+import com.joutio.microservice.core.domain.exception.BaseProblem;
+import com.joutio.microservice.core.domain.exception.ProblemCategory;
+import com.joutio.microservice.core.infrastructure.in.api.response.ExceptionResponse;
+import org.axonframework.queryhandling.QueryExecutionException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class GlobalExceptionHandlerTest {
+
+    private GlobalExceptionHandler handler;
+
+    @BeforeEach
+    void setUp() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(Config.class)
+                .run(context -> handler =
+                        new GlobalExceptionHandler(context.getBean(MicroserviceProperties.class)));
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(MicroserviceProperties.class)
+    static class Config {
+    }
+
+    @Test
+    void noResourceFoundExceptionShouldReturn404() {
+        NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "/favicon.ico");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/favicon.ico");
+
+        ResponseEntity<ExceptionResponse> response =
+                handler.handleNoResourceFoundException(ex, new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().type()).isEqualTo("not-found");
+        assertThat(response.getBody().category()).isEqualTo(ProblemCategory.BUSINESS_RESOURCE_MISSING);
+        assertThat(response.getBody().status()).isEqualTo(404);
+        assertThat(response.getBody().path()).isEqualTo("/favicon.ico");
+    }
+
+    @Test
+    void noResourceFoundExceptionShouldNotReturn500() {
+        NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "/images/missing.png");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/images/missing.png");
+
+        ResponseEntity<ExceptionResponse> response =
+                handler.handleNoResourceFoundException(ex, new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode().value()).isNotEqualTo(500);
+    }
+
+    @Test
+    void catchAllExceptionShouldStillReturn500() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/boom");
+
+        ResponseEntity<ExceptionResponse> response =
+                handler.handleGlobalException(new RuntimeException("boom"), new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(500);
+        assertThat(response.getBody().type()).isEqualTo("internal-server-error");
+    }
+
+    @Test
+    void remoteResourceMissingProblemShouldMapTo404() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/topic-follows/missing");
+        QueryExecutionException ex = new QueryExecutionException(
+                "The remote query handler threw an exception",
+                new TestProblem("topic-follow-not-found", ProblemCategory.BUSINESS_RESOURCE_MISSING),
+                null
+        );
+
+        ResponseEntity<ExceptionResponse> response = handler.handleQueryExecutionException(ex, request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(response.getBody().type()).isEqualTo("topic-follow-not-found");
+        assertThat(response.getBody().category()).isEqualTo(ProblemCategory.BUSINESS_RESOURCE_MISSING);
+        assertThat(response.getBody().status()).isEqualTo(404);
+    }
+
+    @Test
+    void remoteInvalidCommandProblemShouldMapTo400() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/topic-follows");
+        QueryExecutionException ex = new QueryExecutionException(
+                "The remote command handler threw an exception",
+                new TestProblem("cannot-follow-self", ProblemCategory.BUSINESS_INVALID_COMMAND),
+                null
+        );
+
+        ResponseEntity<ExceptionResponse> response = handler.handleQueryExecutionException(ex, request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().type()).isEqualTo("cannot-follow-self");
+    }
+
+    @Test
+    void remoteHandlingExceptionWithoutProblemShouldStillReturn500() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/boom");
+        QueryExecutionException ex = new QueryExecutionException(
+                "The remote query handler threw an exception",
+                new RuntimeException("remote boom"),
+                null
+        );
+
+        ResponseEntity<ExceptionResponse> response = handler.handleQueryExecutionException(ex, request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(500);
+    }
+
+    static class TestProblem extends BaseProblem {
+
+        TestProblem(String type, ProblemCategory category) {
+            super(type, category, "title", "detail", Map.of("key", "value"));
+        }
+    }
+}

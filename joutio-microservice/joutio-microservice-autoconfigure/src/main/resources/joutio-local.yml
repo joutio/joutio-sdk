@@ -1,0 +1,58 @@
+# Défauts du profil `local`, importés par les services via
+# `spring.config.import: optional:classpath:joutio-local.yml` (depuis application-local.yml).
+#
+# Priorité : un fichier importé est **moins prioritaire** que le fichier qui l'importe
+# et que les variables d'environnement. Chaque service peut donc surcharger ces valeurs
+# (ex. datasource, seed-data).
+#
+# ⚠️ Ports/URLs locaux uniquement — jamais utilisés en prod.
+
+spring:
+  kafka:
+    bootstrap-servers: ${JOUTIO_KAFKA_HOST:localhost}:${JOUTIO_KAFKA_PORT:9092}
+
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            # Découverte des pairs du bus Axon (Spring Cloud Simple Discovery).
+            joutio-identity:
+              - uri: http://localhost:8085
+            joutio-theme:
+              - uri: http://localhost:8086
+            joutio-game:
+              - uri: http://localhost:8082
+            joutio-social:
+              - uri: http://localhost:8087
+            joutio-matchmaking:
+              - uri: http://localhost:8090
+            joutio-profile:
+              - uri: http://localhost:8088
+            joutio-leaderboard:
+              - uri: http://localhost:8091
+            joutio-notification:
+              - uri: http://localhost:8093
+
+  security:
+    oauth2:
+      client:
+        # Client M2M `server-client` requis par le distributed command/query bus (Axon).
+        registration:
+          server-client:
+            provider: joutio-identity
+            client-id: server
+            client-secret: ${JOUTIO_IDENTITY_SERVER_CLIENT_SECRET:server-secret}
+            authorization-grant-type: client_credentials
+            scope:
+              - openid
+        provider:
+          joutio-identity:
+            token-uri: http://localhost:8085/oauth2/token
+            jwk-set-uri: http://localhost:8085/oauth2/jwks
+
+# Console lisible en local (le SDK n'active ECS qu'en profil `prod`).
+logging:
+  structured:
+    format:
+      console: ""
