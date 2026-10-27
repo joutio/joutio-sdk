@@ -1,3 +1,9 @@
+## 1.0.0 (2026-10-27)
+
+### Features
+
+* release Joutio SDK 1.0.0 ([62c4fcb](https://github.com/joutio/joutio-sdk/commit/62c4fcb045c82bb35fb10456ca23d6f08e1cda9d))
+
 ## [5.0.0](https://github.com/joutio/joutio-sdk/compare/v4.8.0...v5.0.0) (2026-10-22)
 
 ### ⚠ BREAKING CHANGES
