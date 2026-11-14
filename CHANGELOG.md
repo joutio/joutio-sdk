@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/joutio/joutio-sdk/compare/v1.0.0...v1.0.1) (2026-11-14)
+
+### Bug Fixes
+
+* **sdk:** answer 400 when a required request parameter is missing ([7588fb9](https://github.com/joutio/joutio-sdk/commit/7588fb9a2a3aa146df51dfcaaf93b5710c10561b))
+
 ## 1.0.0 (2026-10-27)
 
 ### Features
