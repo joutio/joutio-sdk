@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.joutio</groupId>
         <artifactId>joutio-parent</artifactId>
-        <version>1.0.1</version>
+        <version>1.0.1-SNAPSHOT</version>
         <relativePath>../joutio-parent/pom.xml</relativePath>
     </parent>
 
