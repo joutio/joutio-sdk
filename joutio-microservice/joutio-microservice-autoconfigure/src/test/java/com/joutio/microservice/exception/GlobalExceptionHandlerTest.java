@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -62,6 +63,18 @@ class GlobalExceptionHandlerTest {
                 handler.handleNoResourceFoundException(ex, new ServletWebRequest(request));
 
         assertThat(response.getStatusCode().value()).isNotEqualTo(500);
+    }
+
+    @Test
+    void missingRequestParameterShouldReturn400() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/suggestions");
+
+        ResponseEntity<ExceptionResponse> response = handler.handleServletRequestBindingException(
+                new MissingServletRequestParameterException("q", "String"), new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().type()).isEqualTo("missing-request-parameter");
+        assertThat(response.getBody().path()).isEqualTo("/api/suggestions");
     }
 
     @Test

@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -34,6 +35,7 @@ import java.util.Optional;
  * - CommandExecutionException: Exceptions des commandes Axon (transformées depuis CommandExecutionProblem)
  * - MethodArgumentNotValidException: Erreurs de validation Bean Validation
  * - IllegalArgumentException: Arguments invalides
+ * - ServletRequestBindingException: paramètre de requête ou en-tête obligatoire absent (400)
  * - NoResourceFoundException: Ressources statiques inexistantes (404, sans log d'erreur)
  * - Exception: Catch-all pour toutes les exceptions non gérées
  * <p>
@@ -126,6 +128,29 @@ public class GlobalExceptionHandler {
         } else {
             logger.warn("Illegal argument: {}", ex.getMessage());
         }
+
+        return buildResponse(response, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Paramètre de requête, en-tête ou variable obligatoire absent : erreur du client (400),
+     * pas une erreur serveur.
+     */
+    @ExceptionHandler(ServletRequestBindingException.class)
+    public ResponseEntity<ExceptionResponse> handleServletRequestBindingException(
+            ServletRequestBindingException ex,
+            WebRequest request) {
+
+        ExceptionResponse response = new ExceptionResponse(
+                "missing-request-parameter",
+                ProblemCategory.BUSINESS_INVALID_COMMAND,
+                "Requête Incomplète",
+                ex.getMessage(),
+                HttpStatus.BAD_REQUEST.value(),
+                request.getDescription(false).replace("uri=", "")
+        );
+
+        logger.warn("Bad request: {}", ex.getMessage());
 
         return buildResponse(response, HttpStatus.BAD_REQUEST);
     }
