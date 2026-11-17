@@ -1,3 +1,4 @@
+com.joutio.axon.autoconfigure.AxonObjectMapperAutoConfiguration
 com.joutio.axon.autoconfigure.AxonDistributedKafkaAutoConfiguration
 com.joutio.axon.autoconfigure.AxonDistributedMetricsAutoConfiguration
 com.joutio.axon.autoconfigure.AxonDistributedActivityMetricsAutoConfiguration

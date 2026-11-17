@@ -44,13 +44,14 @@ public class AxonDistributedQueryAutoConfiguration {
     }
 
     /**
-     * Serializer dédié au query bus distribué : copie de l'{@link ObjectMapper} applicatif enrichie
+     * Serializer dédié au query bus distribué : copie de l'{@link ObjectMapper} du transport Axon (tolérant aux constantes
+     * d'énumération inconnues, {@link AxonObjectMapperAutoConfiguration}) enrichie
      * du codec {@link EventEnvelopeModule} (payload typé via {@code eventType}). Il est détenu hors
      * du type {@link Serializer} pour ne pas perturber les conditions d'Axon sur les serializers
      * général/message/event, qui restent inchangés (format event store préservé).
      */
     @Bean
-    public DistributedQuerySerializer distributedQuerySerializer(ObjectMapper objectMapper,
+    public DistributedQuerySerializer distributedQuerySerializer(@Qualifier(AxonObjectMapperAutoConfiguration.AXON_OBJECT_MAPPER) ObjectMapper objectMapper,
                                                                  RevisionResolver revisionResolver) {
         ObjectMapper queryObjectMapper = objectMapper.copy();
         queryObjectMapper.registerModule(new EventEnvelopeModule());
