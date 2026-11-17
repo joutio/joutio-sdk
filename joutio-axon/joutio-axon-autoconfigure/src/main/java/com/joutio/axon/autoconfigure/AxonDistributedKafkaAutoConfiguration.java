@@ -30,6 +30,8 @@ public class AxonDistributedKafkaAutoConfiguration {
 
     private static final String KAFKA_STREAMABLE_SOURCE_BEAN = "streamableKafkaMessageSource";
     static final String STREAMABLE_SOURCE_BEAN_NAME = KAFKA_STREAMABLE_SOURCE_BEAN;
+    static final String PARTITIONS_PROPERTY = "joutio.axon.kafka.partitions";
+    private static final int DEFAULT_PARTITIONS = 1;
 
     /**
      * Câble la source par défaut des event processors sur le flux Kafka streamable et
@@ -57,9 +59,18 @@ public class AxonDistributedKafkaAutoConfiguration {
                 }));
     }
 
+    /**
+     * Topic Axon commun, à <b>une</b> partition par défaut ({@code joutio.axon.kafka.partitions}).
+     *
+     * <p>Des partitions supplémentaires n'apportent aucun parallélisme : chaque segment d'un
+     * processor lit toutes les partitions et filtre ses séquences. Le parallélisme passe par les
+     * segments ({@link SegmentedProcessingGroupsProperties}). Kafka ne réduit jamais un topic :
+     * changer ce nombre sur un cluster existant exige de recréer le topic.</p>
+     */
     @Bean
     public NewTopic axonDefaultEventTopic(Environment environment) {
         String topicName = environment.getProperty("axon.kafka.default-topic", KafkaProperties.DEFAULT_TOPIC);
-        return new NewTopic(topicName, 3, (short) 1);
+        int partitions = environment.getProperty(PARTITIONS_PROPERTY, Integer.class, DEFAULT_PARTITIONS);
+        return new NewTopic(topicName, partitions, (short) 1);
     }
 }

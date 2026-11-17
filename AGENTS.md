@@ -51,6 +51,7 @@ Les services déclarent `joutio-microservice-core` (domain) et `joutio-microserv
 | `ObservabilityAutoConfiguration` + `ObservabilityEnvironmentPostProcessor` | `microservice.observability.*` | Prometheus, tags `application`/`environment`/`version`, logs JSON ECS, tracing OTLP (désactivé par défaut) |
 | `AxonDistributed*AutoConfiguration` | `axon.distributed.*` (défauts du SDK) | bus de requêtes distribué, transport Kafka, enregistrement local, heartbeat, tracing et métriques Axon |
 | `InstanceScopedProcessingGroupsAutoConfiguration` | `joutio.axon.instance-scoped-groups` | un token par instance (`<groupe>-<HOSTNAME>`), démarrage en queue de flux |
+| `SegmentedProcessingGroupsAutoConfiguration` + `SegmentRebalancer` | `joutio.axon.processors.<groupe>.segments`, `joutio.axon.rebalance-interval` (30 s) | groupe global segmenté, un thread par segment ; répartition des segments entre répliques découvertes |
 | `AxonConsole*AutoConfiguration` | `joutio.axon.console.*`, `joutio.axon.dlq.*` | DLQ, état des processors, API interne, agent vers `joutio-console` |
 | `AxonEventStoreErasureService` | — | effacement RGPD dans l'event store |
 
@@ -93,6 +94,11 @@ Release par `lib-release.yml`. Une évolution du SDK suit la chaîne :
 - **Processing groups** : chaque classe de handlers déclare `@ProcessingGroup` (kebab-case), sinon
   le démarrage échoue. Un replay ciblé consiste à supprimer la ligne `token_entry` du groupe (toutes
   les lignes suffixées pour un groupe instance-scopé).
+- **Partitions** : `Axon.Events` est déclaré à 1 partition (`joutio.axon.kafka.partitions`). Chaque
+  segment lit toutes les partitions : en ajouter ne parallélise rien. Le parallélisme passe par
+  `joutio.axon.processors` ([axon](../../docs/backend/axon.md#segments-et-répliques)).
+- **Segments** : ne jamais passer par `axon.eventhandling.processors.*`, qui rebrancherait le groupe
+  sur l'event store local au lieu de Kafka.
 - **Queue du flux Kafka** : elle s'obtient par `createHeadToken()`. `createTailToken()` renvoie `null`,
   donc le début du topic : un nouveau pod rejouerait tout.
 - **Découverte** :
