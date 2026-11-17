@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/joutio/joutio-sdk/compare/v1.1.0...v1.2.0) (2026-11-17)
+
+### Features
+
+* **axon:** segmented processing groups with replica rebalancer, single-partition Axon topic ([c4dce24](https://github.com/joutio/joutio-sdk/commit/c4dce2466b737bebd5033894b8583dea5bacb6cb))
+
 ## [1.1.0](https://github.com/joutio/joutio-sdk/compare/v1.0.1...v1.1.0) (2026-11-17)
 
 ### Features
