@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/joutio/joutio-sdk/compare/v1.0.1...v1.1.0) (2026-11-17)
+
+### Features
+
+* **axon:** tolerate unknown enum constants on the Axon transport ([1a33ef6](https://github.com/joutio/joutio-sdk/commit/1a33ef6a3d0995cbe6585d12b37b3aae8c68b667))
+
 ## [1.0.1](https://github.com/joutio/joutio-sdk/compare/v1.0.0...v1.0.1) (2026-11-14)
 
 ### Bug Fixes
