@@ -8,7 +8,9 @@ Agrégateur des librairies transverses Joutio : `joutio-parent`, `joutio-microse
 |-----------------------|-----------------------------------------------------------------------------------|
 | `joutio-parent`       | Parent Maven des services et librairies Joutio (BOM, properties, plugins)         |
 | `joutio-microservice` | Starter des microservices Joutio (CORS, Swagger, sécurité, WebSocket, exceptions) |
-| `joutio-axon`         | Starter Axon distribué (RabbitMQ, deadlines, query bus)                           |
+| `joutio-axon`         | Starter Axon distribué (Kafka, bus distribués, deadlines)                         |
+
+Règles et contenu : [`AGENTS.md`](AGENTS.md).
 
 ## Build
 

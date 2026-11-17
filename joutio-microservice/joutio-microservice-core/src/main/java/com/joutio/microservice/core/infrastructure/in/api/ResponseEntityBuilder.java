@@ -21,7 +21,7 @@ public final class ResponseEntityBuilder {
 
     /**
      * Réponse d'une suppression/retrait réussie : {@code 204 No Content} sans corps
-     * (conforme REST — cf. {@code best-practices/.backend/rest-api.md}).
+     * (conforme REST).
      */
     public static ResponseEntity<Void> noContent() {
         return ResponseEntity.noContent().build();
