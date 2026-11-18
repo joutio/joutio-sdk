@@ -1,3 +1,9 @@
+## [2.1.0](https://github.com/joutio/joutio-sdk/compare/v2.0.0...v2.1.0) (2026-11-18)
+
+### Features
+
+* **axon:** consistent command routing and fast cross-pod publication for multi-replica services ([382eadb](https://github.com/joutio/joutio-sdk/commit/382eadbf1b0c79e15ef429ae33e67209387025ed))
+
 ## [2.0.0](https://github.com/joutio/joutio-sdk/compare/v1.2.0...v2.0.0) (2026-11-18)
 
 ### ⚠ BREAKING CHANGES
