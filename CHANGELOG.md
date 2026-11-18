@@ -1,3 +1,13 @@
+## [2.0.0](https://github.com/joutio/joutio-sdk/compare/v1.2.0...v2.0.0) (2026-11-18)
+
+### ⚠ BREAKING CHANGES
+
+* **axon:** the V0 Axon schema changes, every service database must be reset.
+
+### Features
+
+* **axon:** idle-friendly tracking processors and bytea Axon columns ([492be29](https://github.com/joutio/joutio-sdk/commit/492be29fb1d8ef5594efa25130d93fed83cd3ed4))
+
 ## [1.2.0](https://github.com/joutio/joutio-sdk/compare/v1.1.0...v1.2.0) (2026-11-17)
 
 ### Features
