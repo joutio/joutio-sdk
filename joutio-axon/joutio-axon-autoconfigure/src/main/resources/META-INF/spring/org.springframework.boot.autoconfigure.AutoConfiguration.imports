@@ -14,3 +14,5 @@ com.joutio.axon.autoconfigure.SegmentedProcessingGroupsAutoConfiguration
 com.joutio.axon.autoconfigure.AxonConsoleDlqAutoConfiguration
 com.joutio.axon.autoconfigure.AxonConsoleAutoConfiguration
 com.joutio.axon.autoconfigure.AccountErasureAutoConfiguration
+com.joutio.axon.autoconfigure.CommandGatewayRetryAutoConfiguration
+com.joutio.axon.autoconfigure.CapabilityDiscoveryAutoConfiguration

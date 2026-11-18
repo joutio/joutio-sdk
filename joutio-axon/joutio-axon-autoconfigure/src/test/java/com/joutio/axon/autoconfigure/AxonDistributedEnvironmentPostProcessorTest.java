@@ -53,4 +53,19 @@ class AxonDistributedEnvironmentPostProcessorTest {
         assertThat(environment.getProperty("spring.jpa.properties.hibernate.dialect"))
                 .isEqualTo(ByteaPostgreSQLDialect.class.getName());
     }
+
+    @Test
+    void publishesCrossPodEventsWithinAHundredMilliseconds() {
+        postProcessor.postProcessEnvironment(environment, new SpringApplication());
+
+        assertThat(environment.getProperty("axon.eventstore.fetch-delay")).isEqualTo("100ms");
+    }
+
+    @Test
+    void replacesAxonIgnoreListingWithLastKnownCapabilities() {
+        postProcessor.postProcessEnvironment(environment, new SpringApplication());
+
+        assertThat(environment.getProperty("axon.distributed.spring-cloud.enable-ignore-listing", Boolean.class))
+                .isFalse();
+    }
 }

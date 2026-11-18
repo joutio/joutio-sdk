@@ -42,7 +42,9 @@ public class AxonDistributedEnvironmentPostProcessor implements EnvironmentPostP
         defaultProperties.put("axon.distributed.spring-cloud.enabled", true);
         defaultProperties.put("axon.distributed.spring-cloud.mode", "rest");
         defaultProperties.put("axon.distributed.load-factor", 100);
-        defaultProperties.put("axon.distributed.spring-cloud.enable-ignore-listing", true);
+        // Pas d'ignore-listing Axon (exclusion d'1 min par émetteur sur un seul échec) : le SDK garde les
+        // dernières capacités connues (CapabilityDiscoveryAutoConfiguration).
+        defaultProperties.put("axon.distributed.spring-cloud.enable-ignore-listing", false);
         defaultProperties.put("axon.distributed.spring-cloud.enable-accept-all-commands", false);
         defaultProperties.put("axon.distributed.spring-cloud.rest-mode-url", "/command-capabilities");
 
@@ -50,6 +52,10 @@ public class AxonDistributedEnvironmentPostProcessor implements EnvironmentPostP
         // chaque mise à jour d'un token ou d'une saga laissait un large object orphelin.
         // Nom en clair : référencer la classe chargerait Hibernate, optionnel pour ce module.
         defaultProperties.put("spring.jpa.properties.hibernate.dialect", BYTEA_DIALECT);
+
+        // Le pod qui publie vers Kafka ne voit les événements commités par un autre pod qu'en relisant
+        // l'event store : 100 ms au lieu de 1 s par défaut (lecture seule, aucune écriture).
+        defaultProperties.put("axon.eventstore.fetch-delay", "100ms");
 
         defaultProperties.put("axon.kafka.enabled", true);
         defaultProperties.put("axon.kafka.default-topic", KafkaProperties.DEFAULT_TOPIC);

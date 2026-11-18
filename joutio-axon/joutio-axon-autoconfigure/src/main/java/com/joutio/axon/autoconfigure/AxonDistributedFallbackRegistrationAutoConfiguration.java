@@ -14,6 +14,9 @@ import org.springframework.cloud.client.discovery.event.HeartbeatEvent;
 import org.springframework.cloud.client.discovery.simple.SimpleDiscoveryClient;
 import org.springframework.cloud.client.discovery.simple.SimpleDiscoveryClientAutoConfiguration;
 import org.springframework.cloud.client.serviceregistry.Registration;
+import org.springframework.context.ApplicationListener;
+import org.springframework.cloud.client.discovery.event.InstanceRegisteredEvent;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
@@ -64,6 +67,22 @@ public class AxonDistributedFallbackRegistrationAutoConfiguration {
         String host = resolveLocalHost(environment, configuredHost);
         logger.info("Axon fallback Registration: serviceId={}, host={}, port={}", serviceId, host, port);
         return new SimpleRegistration(serviceId, host, port);
+    }
+
+    /**
+     * Publie l'{@code InstanceRegisteredEvent} du {@code Registration} de repli quand l'application
+     * est prête.
+     *
+     * <p>Sans cet événement, le {@code SpringCloudCommandRouter} se nomme {@code SERVICE[LOCAL]} dans
+     * son propre anneau, alors que ses pairs le nomment par son URI : avec deux répliques, une
+     * réplique et le BFF n'envoient pas une même partie au même pod (conflits de séquence, caches
+     * d'agrégats divergents). Un registre de services (Eureka, Consul) publie cet événement ; ni la
+     * découverte Kubernetes ni la Simple Discovery ne le font.</p>
+     */
+    @Bean
+    public FallbackRegistrationPublisher fallbackRegistrationPublisher(Registration registration,
+                                                                       ApplicationEventPublisher publisher) {
+        return new FallbackRegistrationPublisher(registration, publisher);
     }
 
     /**
@@ -189,6 +208,26 @@ public class AxonDistributedFallbackRegistrationAutoConfiguration {
                 initialDelayString = "${axon.distributed.spring-cloud.heartbeat-interval:10000}")
         public void emitHeartbeat() {
             publisher.publishEvent(new HeartbeatEvent(this, heartbeatState.incrementAndGet()));
+        }
+    }
+
+    public static class FallbackRegistrationPublisher implements ApplicationListener<ApplicationReadyEvent> {
+
+        private final Registration registration;
+        private final ApplicationEventPublisher publisher;
+
+        FallbackRegistrationPublisher(Registration registration, ApplicationEventPublisher publisher) {
+            this.registration = registration;
+            this.publisher = publisher;
+        }
+
+        @Override
+        public void onApplicationEvent(ApplicationReadyEvent event) {
+            // Un vrai registre publie déjà l'événement : seul le Registration de repli est concerné.
+            if (registration instanceof SimpleRegistration) {
+                logger.info("Instance locale enregistrée dans le bus de commandes: {}", registration.getUri());
+                publisher.publishEvent(new InstanceRegisteredEvent<>(this, registration));
+            }
         }
     }
 }
