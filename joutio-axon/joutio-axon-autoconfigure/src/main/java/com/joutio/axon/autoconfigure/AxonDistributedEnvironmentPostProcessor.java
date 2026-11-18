@@ -16,6 +16,7 @@ public class AxonDistributedEnvironmentPostProcessor implements EnvironmentPostP
 
     private static final String PROPERTY_SOURCE_NAME = "axonDistributedDefaultProperties";
     private static final String DISABLE_AXONIQ_CONSOLE_MESSAGE = "disable-axoniq-console-message";
+    static final String BYTEA_DIALECT = "com.joutio.axon.autoconfigure.ByteaPostgreSQLDialect";
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
@@ -44,6 +45,11 @@ public class AxonDistributedEnvironmentPostProcessor implements EnvironmentPostP
         defaultProperties.put("axon.distributed.spring-cloud.enable-ignore-listing", true);
         defaultProperties.put("axon.distributed.spring-cloud.enable-accept-all-commands", false);
         defaultProperties.put("axon.distributed.spring-cloud.rest-mode-url", "/command-capabilities");
+
+        // Colonnes binaires des entités Axon (@Lob) en bytea plutôt qu'en large objects (oid) :
+        // chaque mise à jour d'un token ou d'une saga laissait un large object orphelin.
+        // Nom en clair : référencer la classe chargerait Hibernate, optionnel pour ce module.
+        defaultProperties.put("spring.jpa.properties.hibernate.dialect", BYTEA_DIALECT);
 
         defaultProperties.put("axon.kafka.enabled", true);
         defaultProperties.put("axon.kafka.default-topic", KafkaProperties.DEFAULT_TOPIC);

@@ -29,7 +29,8 @@ class SegmentedProcessingGroupsAutoConfigurationTest {
                 .segmentedProcessingGroupsConfigurer(
                         new SegmentedProcessingGroupsProperties(
                                 Map.of("saga-like", new SegmentedProcessingGroupsProperties.Processor(4)), null),
-                        new InstanceScopedProcessingGroupsProperties(List.of(), null))
+                        new InstanceScopedProcessingGroupsProperties(List.of(), null),
+                        TrackingProcessorDefaultsTest.defaults())
                 .configureModule(configurer);
 
         Configuration configuration = configurer.buildConfiguration();
@@ -47,7 +48,8 @@ class SegmentedProcessingGroupsAutoConfigurationTest {
         new SegmentedProcessingGroupsAutoConfiguration()
                 .segmentedProcessingGroupsConfigurer(
                         new SegmentedProcessingGroupsProperties(null, null),
-                        new InstanceScopedProcessingGroupsProperties(List.of(), null))
+                        new InstanceScopedProcessingGroupsProperties(List.of(), null),
+                        TrackingProcessorDefaultsTest.defaults())
                 .configureModule(configurer);
 
         Configuration configuration = configurer.buildConfiguration();
@@ -66,7 +68,8 @@ class SegmentedProcessingGroupsAutoConfigurationTest {
         InstanceScopedProcessingGroupsProperties instanceScoped =
                 new InstanceScopedProcessingGroupsProperties(List.of("fanout"), null);
 
-        assertThatThrownBy(() -> autoConfiguration.segmentedProcessingGroupsConfigurer(properties, instanceScoped))
+        assertThatThrownBy(() -> autoConfiguration.segmentedProcessingGroupsConfigurer(
+                properties, instanceScoped, TrackingProcessorDefaultsTest.defaults()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("fanout");
     }

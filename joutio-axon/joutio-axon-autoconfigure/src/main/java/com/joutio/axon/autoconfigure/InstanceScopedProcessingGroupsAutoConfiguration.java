@@ -39,7 +39,8 @@ public class InstanceScopedProcessingGroupsAutoConfiguration {
     public ConfigurerModule instanceScopedProcessingGroupsConfigurer(
             InstanceScopedProcessingGroupsProperties properties,
             Environment environment,
-            ApplicationContext applicationContext) {
+            ApplicationContext applicationContext,
+            TrackingProcessorDefaults defaults) {
         List<String> baseGroups = properties.instanceScopedGroups();
         if (baseGroups.isEmpty()) {
             return configurer -> {
@@ -58,9 +59,9 @@ public class InstanceScopedProcessingGroupsAutoConfiguration {
                 eventProcessing.registerTrackingEventProcessor(scopedGroup,
                         configuration -> kafkaSource(applicationContext));
                 eventProcessing.registerTrackingEventProcessorConfiguration(scopedGroup,
-                        configuration -> TrackingEventProcessorConfiguration
+                        configuration -> defaults.apply(scopedGroup, TrackingEventProcessorConfiguration
                                 .forSingleThreadedProcessing()
-                                .andInitialTrackingToken(initialTokenBuilder()));
+                                .andInitialTrackingToken(initialTokenBuilder())));
             }
         });
     }

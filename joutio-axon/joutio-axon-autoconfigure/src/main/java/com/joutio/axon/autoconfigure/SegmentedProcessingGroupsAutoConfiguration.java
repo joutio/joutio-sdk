@@ -13,7 +13,8 @@ import java.util.Map;
 
 /**
  * Applique {@link SegmentedProcessingGroupsProperties} aux processors tracking des groupes globaux
- * et répartit leurs segments entre répliques ({@link SegmentRebalancer}).
+ * et répartit leurs segments entre répliques ({@link SegmentRebalancer}). Les réglages communs
+ * ({@link TrackingProcessorDefaults}) s'appliquent aussi aux groupes segmentés.
  *
  * <p>Seule la configuration du processor change : la source reste le flux Kafka streamable posé
  * par {@link AxonDistributedKafkaAutoConfiguration} (passer par
@@ -30,7 +31,8 @@ public class SegmentedProcessingGroupsAutoConfiguration {
     @Bean
     public ConfigurerModule segmentedProcessingGroupsConfigurer(
             SegmentedProcessingGroupsProperties properties,
-            InstanceScopedProcessingGroupsProperties instanceScoped) {
+            InstanceScopedProcessingGroupsProperties instanceScoped,
+            TrackingProcessorDefaults defaults) {
         Map<String, SegmentedProcessingGroupsProperties.Processor> processors = properties.processors();
         processors.keySet().stream()
                 .filter(instanceScoped.instanceScopedGroups()::contains)
@@ -41,9 +43,9 @@ public class SegmentedProcessingGroupsAutoConfiguration {
                 });
         return configurer -> configurer.eventProcessing(eventProcessing -> processors.forEach(
                 (group, processor) -> eventProcessing.registerTrackingEventProcessorConfiguration(group,
-                        configuration -> TrackingEventProcessorConfiguration
+                        configuration -> defaults.apply(group, TrackingEventProcessorConfiguration
                                 .forParallelProcessing(processor.segments())
-                                .andInitialSegmentsCount(processor.segments()))));
+                                .andInitialSegmentsCount(processor.segments())))));
     }
 
     @Bean

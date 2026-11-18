@@ -31,7 +31,8 @@ class InstanceScopedProcessingGroupsAutoConfigurationTest {
                 .instanceScopedProcessingGroupsConfigurer(
                         new InstanceScopedProcessingGroupsProperties(List.of("fanout"), "pod-1"),
                         new MockEnvironment(),
-                        applicationContext(source))
+                        applicationContext(source),
+                        TrackingProcessorDefaultsTest.defaults())
                 .configureModule(configurer);
 
         Configuration configuration = configurer.buildConfiguration();
@@ -50,7 +51,8 @@ class InstanceScopedProcessingGroupsAutoConfigurationTest {
                 .instanceScopedProcessingGroupsConfigurer(
                         new InstanceScopedProcessingGroupsProperties(List.of(), null),
                         new MockEnvironment(),
-                        applicationContext(source))
+                        applicationContext(source),
+                        TrackingProcessorDefaultsTest.defaults())
                 .configureModule(configurer);
 
         Configuration configuration = configurer.buildConfiguration();
@@ -88,7 +90,8 @@ class InstanceScopedProcessingGroupsAutoConfigurationTest {
                 .instanceScopedProcessingGroupsConfigurer(
                         new InstanceScopedProcessingGroupsProperties(List.of("fanout"), null),
                         environment,
-                        applicationContext(source))
+                        applicationContext(source),
+                        TrackingProcessorDefaultsTest.defaults())
                 .configureModule(configurer);
 
         Configuration configuration = configurer.buildConfiguration();

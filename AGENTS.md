@@ -50,10 +50,12 @@ Les services déclarent `joutio-microservice-core` (domain) et `joutio-microserv
 | `CorsAutoConfiguration`, `SwaggerAutoConfiguration`, `ActuatorAutoConfiguration`, `ExceptionAutoConfiguration` | `microservice.*.enabled` | CORS, OpenAPI, Actuator, handler RFC 7807 + intercepteurs Axon |
 | `ObservabilityAutoConfiguration` + `ObservabilityEnvironmentPostProcessor` | `microservice.observability.*` | Prometheus, tags `application`/`environment`/`version`, logs JSON ECS, tracing OTLP (désactivé par défaut) |
 | `AxonDistributed*AutoConfiguration` | `axon.distributed.*` (défauts du SDK) | bus de requêtes distribué, transport Kafka, enregistrement local, heartbeat, tracing et métriques Axon |
+| `TrackingProcessorDefaultsAutoConfiguration` | `joutio.axon.event-availability-timeout` (5 s) | réglages communs de tous les tracking processors ; token initial en tête pour les groupes `@Saga` |
 | `InstanceScopedProcessingGroupsAutoConfiguration` | `joutio.axon.instance-scoped-groups` | un token par instance (`<groupe>-<HOSTNAME>`), démarrage en queue de flux |
 | `SegmentedProcessingGroupsAutoConfiguration` + `SegmentRebalancer` | `joutio.axon.processors.<groupe>.segments`, `joutio.axon.rebalance-interval` (30 s) | groupe global segmenté, un thread par segment ; répartition des segments entre répliques découvertes |
 | `AxonConsole*AutoConfiguration` | `joutio.axon.console.*`, `joutio.axon.dlq.*` | DLQ, état des processors, API interne, agent vers `joutio-console` |
 | `AxonEventStoreErasureService` | — | effacement RGPD dans l'event store |
+| `ByteaPostgreSQLDialect` | `spring.jpa.properties.hibernate.dialect` (défaut du SDK) | `@Lob byte[]` des entités Axon en `bytea` (schéma `V0`), pas en large objects |
 
 Les défauts sont posés en priorité la plus basse. Un service ne redéclare **jamais**
 `axon.axonserver.*`, `axon.kafka.*`, `axon.distributed.*` ni les propriétés d'observabilité : il
@@ -97,6 +99,9 @@ Release par `lib-release.yml`. Une évolution du SDK suit la chaîne :
 - **Partitions** : `Axon.Events` est déclaré à 1 partition (`joutio.axon.kafka.partitions`). Chaque
   segment lit toutes les partitions : en ajouter ne parallélise rien. Le parallélisme passe par
   `joutio.axon.processors` ([axon](../../docs/backend/axon.md#segments-et-répliques)).
+- **Configuration par nom d'un processor** : elle remplace entièrement le défaut. Toute
+  configuration enregistrée par le SDK passe par `TrackingProcessorDefaults.apply`, sinon le groupe
+  perd le timeout commun (et une saga son démarrage en tête de flux).
 - **Segments** : ne jamais passer par `axon.eventhandling.processors.*`, qui rebrancherait le groupe
   sur l'event store local au lieu de Kafka.
 - **Queue du flux Kafka** : elle s'obtient par `createHeadToken()`. `createTailToken()` renvoie `null`,

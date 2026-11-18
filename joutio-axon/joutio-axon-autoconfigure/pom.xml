@@ -83,6 +83,12 @@
             <artifactId>axon-eventsourcing</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- Dialecte Postgres du SDK (BLOB en bytea) : Hibernate est fourni par le starter data-jpa des services. -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>org.axonframework</groupId>

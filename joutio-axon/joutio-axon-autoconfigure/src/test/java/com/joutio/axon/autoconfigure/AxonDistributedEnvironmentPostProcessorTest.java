@@ -45,4 +45,12 @@ class AxonDistributedEnvironmentPostProcessorTest {
         assertThat(environment.getProperty("axon.distributed.enabled", Boolean.class)).isTrue();
         assertThat(environment.getProperty("spring.cloud.kubernetes.discovery.enabled", Boolean.class)).isFalse();
     }
+
+    @Test
+    void storesAxonBinaryColumnsAsBytea() {
+        postProcessor.postProcessEnvironment(environment, new SpringApplication());
+
+        assertThat(environment.getProperty("spring.jpa.properties.hibernate.dialect"))
+                .isEqualTo(ByteaPostgreSQLDialect.class.getName());
+    }
 }
