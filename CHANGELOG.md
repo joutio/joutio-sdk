@@ -1,3 +1,9 @@
+## [2.1.1](https://github.com/joutio/joutio-sdk/compare/v2.1.0...v2.1.1) (2026-11-19)
+
+### Bug Fixes
+
+* **axon:** deadline thread pool and event-store erasure on bytea payloads ([9da596b](https://github.com/joutio/joutio-sdk/commit/9da596b64d7beda34ec281c2948a133282a7fc43))
+
 ## [2.1.0](https://github.com/joutio/joutio-sdk/compare/v2.0.0...v2.1.0) (2026-11-18)
 
 ### Features
