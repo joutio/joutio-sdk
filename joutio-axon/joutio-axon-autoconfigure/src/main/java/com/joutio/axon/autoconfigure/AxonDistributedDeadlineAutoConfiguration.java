@@ -4,6 +4,7 @@ import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration;
 import com.github.kagkarlsson.scheduler.task.Task;
 import com.joutio.axon.deadline.CombinedDeadlineManager;
+import org.axonframework.common.AxonThreadFactory;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.ConfigurationScopeAwareProvider;
 import org.axonframework.deadline.DeadlineManager;
@@ -20,7 +21,10 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+
+import java.util.concurrent.Executors;
 
 /**
  * Reprend la main sur le {@link DeadlineManager} afin de fournir un {@link CombinedDeadlineManager}
@@ -43,6 +47,7 @@ import org.springframework.context.annotation.Bean;
                 DbSchedulerAutoConfiguration.class
         }
 )
+@EnableConfigurationProperties(DeadlineProperties.class)
 public class AxonDistributedDeadlineAutoConfiguration {
 
     private static final Logger logger = LoggerFactory.getLogger(AxonDistributedDeadlineAutoConfiguration.class);
@@ -51,9 +56,10 @@ public class AxonDistributedDeadlineAutoConfiguration {
     public DeadlineManager deadlineManager(
             org.axonframework.config.Configuration configuration,
             TransactionManager transactionManager,
-            ObjectProvider<PersistentDeadlineManagerHolder> persistentHolderProvider
+            ObjectProvider<PersistentDeadlineManagerHolder> persistentHolderProvider,
+            DeadlineProperties properties
     ) {
-        DeadlineManager transientDeadlineManager = simpleDeadlineManager(configuration, transactionManager);
+        DeadlineManager transientDeadlineManager = simpleDeadlineManager(configuration, transactionManager, properties);
 
         PersistentDeadlineManagerHolder persistentHolder = persistentHolderProvider.getIfAvailable();
         if (persistentHolder == null) {
@@ -116,11 +122,14 @@ public class AxonDistributedDeadlineAutoConfiguration {
 
     private DeadlineManager simpleDeadlineManager(
             org.axonframework.config.Configuration configuration,
-            TransactionManager transactionManager
+            TransactionManager transactionManager,
+            DeadlineProperties properties
     ) {
         return new SimpleDeadlineManager.Builder()
                 .scopeAwareProvider(new ConfigurationScopeAwareProvider(configuration))
                 .transactionManager(transactionManager)
+                .scheduledExecutorService(Executors.newScheduledThreadPool(
+                        properties.threads(), new AxonThreadFactory("deadline-manager")))
                 .build();
     }
 

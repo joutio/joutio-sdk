@@ -56,7 +56,8 @@ Les services déclarent `joutio-microservice-core` (domain) et `joutio-microserv
 | `InstanceScopedProcessingGroupsAutoConfiguration` | `joutio.axon.instance-scoped-groups` | un token par instance (`<groupe>-<HOSTNAME>`), démarrage en queue de flux |
 | `SegmentedProcessingGroupsAutoConfiguration` + `SegmentRebalancer` | `joutio.axon.processors.<groupe>.segments`, `joutio.axon.rebalance-interval` (30 s) | groupe global segmenté, un thread par segment ; répartition des segments entre répliques découvertes |
 | `AxonConsole*AutoConfiguration` | `joutio.axon.console.*`, `joutio.axon.dlq.*` | DLQ, état des processors, API interne, agent vers `joutio-console` |
-| `AxonEventStoreErasureService` | — | effacement RGPD dans l'event store |
+| `AxonDistributedDeadlineAutoConfiguration` | `joutio.axon.deadline.threads` (4) | deadlines < 5 min en mémoire sur un pool de threads (Axon n'en prend qu'un), au-delà db-scheduler (`CombinedDeadlineManager`) |
+| `AxonEventStoreErasureService` | — | effacement RGPD dans l'event store (payloads `bytea`, testé sur le vrai schéma) |
 | `ByteaPostgreSQLDialect` | `spring.jpa.properties.hibernate.dialect` (défaut du SDK) | `@Lob byte[]` des entités Axon en `bytea` (schéma `V0`), pas en large objects |
 
 Les défauts sont posés en priorité la plus basse. Un service ne redéclare **jamais**
