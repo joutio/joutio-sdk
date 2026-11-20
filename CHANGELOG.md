@@ -1,3 +1,9 @@
+## [2.2.0](https://github.com/joutio/joutio-sdk/compare/v2.1.1...v2.2.0) (2026-11-20)
+
+### Features
+
+* **axon:** kafka consumer, segment and rebalancer metrics ([ae45318](https://github.com/joutio/joutio-sdk/commit/ae45318f43181a6b7858cef29f272197136e06f0))
+
 ## [2.1.1](https://github.com/joutio/joutio-sdk/compare/v2.1.0...v2.1.1) (2026-11-19)
 
 ### Bug Fixes
