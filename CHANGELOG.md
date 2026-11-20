@@ -1,3 +1,9 @@
+## [2.4.1](https://github.com/joutio/joutio-sdk/compare/v2.4.0...v2.4.1) (2026-11-20)
+
+### Bug Fixes
+
+* **parent:** inherit Spring Boot 3.5.16 and patch vulnerable dependencies ([dbff1b3](https://github.com/joutio/joutio-sdk/commit/dbff1b31639e704e2d77141e3f02fd4a6e88f09b))
+
 ## [2.4.0](https://github.com/joutio/joutio-sdk/compare/v2.3.0...v2.4.0) (2026-11-20)
 
 ### Features
