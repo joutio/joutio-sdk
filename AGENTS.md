@@ -13,7 +13,7 @@ Package racine `com.joutio`. Une release publie tous les modules à la même ver
 
 | Module | Rôle |
 |---|---|
-| `joutio-parent` | BOM parent (Spring Boot 3.5, Axon 4.13, Java 25, Lombok…), versions des artefacts du SDK, `build-info` hérité |
+| `joutio-parent` | BOM parent (Spring Boot 3.5.16 et correctifs de sécurité, Axon 4.13, Java 25, Lombok…), versions des artefacts du SDK, `build-info` hérité |
 | `joutio-microservice-core` | types techniques partagés, dépendance des `*-domain` |
 | `joutio-microservice-autoconfigure` | auto-configurations Spring |
 | `joutio-microservice-starter` | point d'entrée des `*-infrastructure` (autoconfigure + `joutio-axon-starter`) |
@@ -134,3 +134,8 @@ Release par `lib-release.yml`. Une évolution du SDK suit la chaîne :
   suivant est traité.
 - Un compteur métier passe par un port du domaine (ex. `GameMetricsPort`), implémenté en
   infrastructure avec `MeterRegistry`. Jamais de Micrometer dans `domain/`.
+- **Version de Spring Boot** : seule celle du parent `spring-boot-starter-parent` compte. Le `dependencyManagement`
+  hérité prime sur un BOM importé : un import `spring-boot-dependencies` d'une autre version est ignoré (les services
+  sont restés en 3.5.14 jusqu'au 2026-11-20). Spring Boot 3.5 n'ayant plus de patch, les correctifs de sécurité
+  passent par les propriétés de version du parent (`tomcat.version`, `netty.version`…) et par le bloc des
+  transitives corrigées de `joutio-parent`.
