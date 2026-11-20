@@ -6,10 +6,13 @@ import org.axonframework.eventhandling.TrackedEventMessage;
 import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.eventhandling.TrackingToken;
 import org.axonframework.messaging.StreamableMessageSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.env.Environment;
 
@@ -28,6 +31,8 @@ import java.util.function.Function;
  * <p>Conséquence opérationnelle : les noms de processors sont suffixés (métriques, et
  * {@code token_entry} — un replay ciblé d'un groupe instance-scopé doit supprimer toutes ses lignes
  * suffixées).</p>
+ *
+ * <p>Le pod n'est prêt qu'une fois ces processors à jour ({@link InstanceScopedProcessorsHealthIndicator}).</p>
  */
 @AutoConfiguration
 @EnableConfigurationProperties(InstanceScopedProcessingGroupsProperties.class)
@@ -64,6 +69,24 @@ public class InstanceScopedProcessingGroupsAutoConfiguration {
                                 .andInitialTrackingToken(initialTokenBuilder())));
             }
         });
+    }
+
+    /** Indicateur de readiness, présent seulement avec l'actuator (services, pas les tests de module). */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
+    static class InstanceScopedReadinessConfiguration {
+
+        @Bean
+        InstanceScopedProcessorsHealthIndicator axonInstanceScopedProcessorsHealthIndicator(
+                InstanceScopedProcessingGroupsProperties properties,
+                Environment environment,
+                ObjectProvider<org.axonframework.config.Configuration> configuration) {
+            String instanceId = instanceId(properties, environment);
+            return new InstanceScopedProcessorsHealthIndicator(configuration, properties.instanceScopedGroups()
+                    .stream()
+                    .map(group -> group + "-" + instanceId)
+                    .toList());
+        }
     }
 
     /**

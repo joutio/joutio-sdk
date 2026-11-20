@@ -105,6 +105,13 @@
             <artifactId>axon-springcloud-spring-boot-autoconfigure</artifactId>
         </dependency>
 
+        <!-- Readiness des groupes instance-scopés : fourni par l'actuator des services. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-actuator</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-commons</artifactId>
