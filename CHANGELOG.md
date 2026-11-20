@@ -1,3 +1,9 @@
+## [2.4.0](https://github.com/joutio/joutio-sdk/compare/v2.3.0...v2.4.0) (2026-11-20)
+
+### Features
+
+* **axon:** instance-scoped groups as subscribing processors on one Kafka consumer per pod ([b5e769a](https://github.com/joutio/joutio-sdk/commit/b5e769a879ad356185ed18afa036c008db73b4ac))
+
 ## [2.3.0](https://github.com/joutio/joutio-sdk/compare/v2.2.1...v2.3.0) (2026-11-20)
 
 ### Features
