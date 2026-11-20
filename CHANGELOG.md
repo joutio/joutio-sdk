@@ -1,3 +1,9 @@
+## [2.2.1](https://github.com/joutio/joutio-sdk/compare/v2.2.0...v2.2.1) (2026-11-20)
+
+### Bug Fixes
+
+* **axon:** distinct Kafka consumer series and opened counter name ([a3271fd](https://github.com/joutio/joutio-sdk/commit/a3271fde19a3b9e53b0995913b16ae641ce485eb))
+
 ## [2.2.0](https://github.com/joutio/joutio-sdk/compare/v2.1.1...v2.2.0) (2026-11-20)
 
 ### Features
