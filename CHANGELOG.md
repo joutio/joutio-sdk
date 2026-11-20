@@ -1,3 +1,9 @@
+## [2.3.0](https://github.com/joutio/joutio-sdk/compare/v2.2.1...v2.3.0) (2026-11-20)
+
+### Features
+
+* **axon:** readiness waits for instance-scoped processors to catch up ([847b830](https://github.com/joutio/joutio-sdk/commit/847b830439e4f2ba61c11a1d0a6a973134d9ff0f))
+
 ## [2.2.1](https://github.com/joutio/joutio-sdk/compare/v2.2.0...v2.2.1) (2026-11-20)
 
 ### Bug Fixes
