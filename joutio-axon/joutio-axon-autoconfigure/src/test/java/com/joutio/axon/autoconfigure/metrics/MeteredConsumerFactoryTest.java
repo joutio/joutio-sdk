@@ -17,18 +17,18 @@ class MeteredConsumerFactoryTest {
             groupId -> new MockConsumer<>(OffsetResetStrategy.EARLIEST), registry);
 
     @Test
-    void tracksOpenAndCreatedConsumers() {
+    void tracksOpenAndOpenedConsumers() {
         Consumer<String, byte[]> first = factory.createConsumer(null);
         Consumer<String, byte[]> second = factory.createConsumer(null);
 
         assertThat(open()).isEqualTo(2.0);
-        assertThat(created()).isEqualTo(2.0);
+        assertThat(opened()).isEqualTo(2.0);
 
         first.close();
         second.close(Duration.ofSeconds(1));
 
         assertThat(open()).isZero();
-        assertThat(created()).isEqualTo(2.0);
+        assertThat(opened()).isEqualTo(2.0);
     }
 
     @Test
@@ -53,7 +53,7 @@ class MeteredConsumerFactoryTest {
         return registry.get("joutio.axon.kafka.consumers.open").gauge().value();
     }
 
-    private double created() {
-        return registry.get("joutio.axon.kafka.consumers.created").counter().count();
+    private double opened() {
+        return registry.get("joutio.axon.kafka.consumers.opened").counter().count();
     }
 }
