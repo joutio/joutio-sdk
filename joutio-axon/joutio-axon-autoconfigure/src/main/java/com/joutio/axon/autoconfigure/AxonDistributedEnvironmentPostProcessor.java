@@ -56,9 +56,6 @@ public class AxonDistributedEnvironmentPostProcessor implements EnvironmentPostP
         // Le pod qui publie vers Kafka ne voit les événements commités par un autre pod qu'en relisant
         // l'event store : 100 ms au lieu de 1 s par défaut (lecture seule, aucune écriture).
         defaultProperties.put("axon.eventstore.fetch-delay", "100ms");
-        // Un pod n'est prêt qu'une fois ses groupes instance-scopés à jour (toujours UP sans eux).
-        defaultProperties.put("management.endpoint.health.group.readiness.include",
-                "readinessState,axonInstanceScopedProcessors");
 
         defaultProperties.put("axon.kafka.enabled", true);
         defaultProperties.put("axon.kafka.default-topic", KafkaProperties.DEFAULT_TOPIC);

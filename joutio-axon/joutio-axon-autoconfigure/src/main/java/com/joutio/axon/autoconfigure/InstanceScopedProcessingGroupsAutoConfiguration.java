@@ -1,122 +1,128 @@
 package com.joutio.axon.autoconfigure;
 
+import com.joutio.axon.autoconfigure.metrics.MeteredConsumerFactory;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.axonframework.config.ConfigurerModule;
-import org.axonframework.config.ProcessingGroup;
-import org.axonframework.eventhandling.TrackedEventMessage;
-import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
-import org.axonframework.eventhandling.TrackingToken;
-import org.axonframework.messaging.StreamableMessageSource;
+import org.axonframework.extensions.kafka.KafkaProperties;
+import org.axonframework.extensions.kafka.eventhandling.KafkaMessageConverter;
+import org.axonframework.extensions.kafka.eventhandling.consumer.ConsumerFactory;
+import org.axonframework.extensions.kafka.eventhandling.consumer.DefaultConsumerFactory;
+import org.axonframework.extensions.kafka.eventhandling.consumer.Fetcher;
+import org.axonframework.extensions.kafka.eventhandling.consumer.subscribable.SubscribableKafkaMessageSource;
+import org.axonframework.lifecycle.Phase;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.env.Environment;
 
+import java.util.HashMap;
 import java.util.List;
-import java.util.function.Function;
+import java.util.Map;
+import java.util.function.Supplier;
 
 /**
- * Processing groups **par instance** : chaque réplique d'un service à fan-out temps réel consomme
+ * Processing groups <b>par instance</b> : chaque réplique d'un service à fan-out temps réel reçoit
  * tous les événements (cf. {@link InstanceScopedProcessingGroupsProperties}).
  *
- * <p>Pour chaque groupe de base configuré, un sélecteur de type (prioritaire sur l'annotation
- * {@link ProcessingGroup}) assigne les handlers annotés au nom suffixé `<groupe>-<instanceId>`, et
- * le processor correspondant est enregistré en <b>tracking</b> sur la source streamable Kafka du
- * SDK (pas l'event store local !) avec un token initial à la <b>queue</b> du flux.</p>
+ * <p>Chaque groupe listé est un <b>subscribing processor</b>, le type Axon du traitement en direct
+ * sans rejeu. Tous les groupes d'une instance partagent une seule
+ * {@link SubscribableKafkaMessageSource} : un consumer Kafka par pod, dans un consumer group propre à
+ * l'instance ({@code <application>.<instanceId>}), qui démarre à la fin du topic et ne commite aucun
+ * offset. Aucune position n'est donc écrite, ni dans {@code token_entry} ni dans Kafka : un pod qui
+ * démarre ne reçoit que les événements à venir, les clients complètent l'historique par les folds
+ * REST.</p>
  *
- * <p>Conséquence opérationnelle : les noms de processors sont suffixés (métriques, et
- * {@code token_entry} — un replay ciblé d'un groupe instance-scopé doit supprimer toutes ses lignes
- * suffixées).</p>
- *
- * <p>Le pod n'est prêt qu'une fois ces processors à jour ({@link InstanceScopedProcessorsHealthIndicator}).</p>
+ * <p>Les handlers de ces groupes s'exécutent sur le thread du consumer, l'un après l'autre : ils
+ * restent non bloquants (envoi STOMP, appels asynchrones), sinon un handler lent retarde tous les
+ * groupes du pod. Une exception est journalisée et l'événement suivant est traité (pas de DLQ).</p>
  */
 @AutoConfiguration
 @EnableConfigurationProperties(InstanceScopedProcessingGroupsProperties.class)
 public class InstanceScopedProcessingGroupsAutoConfiguration {
 
     private static final String FALLBACK_INSTANCE_ID = "local";
+    private static final String FETCHER_BEAN = "kafkaFetcher";
+    private static final String MESSAGE_CONVERTER_BEAN = "kafkaMessageConverter";
+    /** Démarre la source après l'abonnement de tous les processors (phase {@code INBOUND_EVENT_CONNECTORS}). */
+    static final int SOURCE_PHASE = Phase.INBOUND_EVENT_CONNECTORS + 1;
 
     @Bean
     public ConfigurerModule instanceScopedProcessingGroupsConfigurer(
             InstanceScopedProcessingGroupsProperties properties,
             Environment environment,
             ApplicationContext applicationContext,
-            TrackingProcessorDefaults defaults) {
-        List<String> baseGroups = properties.instanceScopedGroups();
-        if (baseGroups.isEmpty()) {
+            ObjectProvider<MeterRegistry> registry) {
+        List<String> groups = properties.instanceScopedGroups();
+        if (groups.isEmpty()) {
             return configurer -> {
                 // Aucun groupe instance-scopé : configuration inchangée.
             };
         }
-        String instanceId = instanceId(properties, environment);
-        return configurer -> configurer.eventProcessing(eventProcessing -> {
-            for (String baseGroup : baseGroups) {
-                String scopedGroup = baseGroup + "-" + instanceId;
-                eventProcessing.assignHandlerTypesMatching(scopedGroup,
-                        type -> isAnnotatedWith(type, baseGroup));
-                // Source explicite : le `registerTrackingEventProcessor(name)` à un argument lie
-                // le processor à l'event store LOCAL (vide côté BFF) — il faut la source streamable
-                // Kafka du SDK, comme pour les processors auto-créés.
-                eventProcessing.registerTrackingEventProcessor(scopedGroup,
-                        configuration -> kafkaSource(applicationContext));
-                eventProcessing.registerTrackingEventProcessorConfiguration(scopedGroup,
-                        configuration -> defaults.apply(scopedGroup, TrackingEventProcessorConfiguration
-                                .forSingleThreadedProcessing()
-                                .andInitialTrackingToken(initialTokenBuilder())));
-            }
-        });
-    }
-
-    /** Indicateur de readiness, présent seulement avec l'actuator (services, pas les tests de module). */
-    @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
-    static class InstanceScopedReadinessConfiguration {
-
-        @Bean
-        InstanceScopedProcessorsHealthIndicator axonInstanceScopedProcessorsHealthIndicator(
-                InstanceScopedProcessingGroupsProperties properties,
-                Environment environment,
-                ObjectProvider<org.axonframework.config.Configuration> configuration) {
-            String instanceId = instanceId(properties, environment);
-            return new InstanceScopedProcessorsHealthIndicator(configuration, properties.instanceScopedGroups()
-                    .stream()
-                    .map(group -> group + "-" + instanceId)
-                    .toList());
-        }
+        String groupId = consumerGroupId(properties, environment);
+        return configurer -> {
+            Supplier<SubscribableKafkaMessageSource<String, byte[]>> source =
+                    memoize(() -> liveSource(applicationContext, registry.getIfAvailable(), groupId));
+            configurer.eventProcessing(eventProcessing -> groups.forEach(group ->
+                    eventProcessing.registerSubscribingEventProcessor(group, configuration -> source.get())));
+            configurer.onStart(SOURCE_PHASE, () -> source.get().start());
+            configurer.onShutdown(SOURCE_PHASE, () -> source.get().close());
+        };
     }
 
     /**
-     * Token initial des groupes instance-scopés : la <b>queue</b> du flux (head), pas le début.
-     * <p>
-     * {@code createTailToken()} renvoie {@code null} pour la source Kafka, ce qui fait démarrer le
-     * processor au début du topic ({@code ConsumerSeekUtil} → offset 0) : chaque nouveau pod
-     * rejouait <b>tout</b> le flux et re-poussait les anciens événements aux clients connectés
-     * (toasts « déjà reçus », notifications dupliquées). Les clients complètent l'historique via
-     * les folds REST ; un nouveau pod ne consomme donc que les événements à venir.
+     * Propriétés du consumer partagé : celles de {@code axon.kafka.consumer}, sauf le point de départ
+     * (fin du topic, le défaut du SDK étant le début) et le commit d'offsets (aucun).
      */
-    static Function<StreamableMessageSource<TrackedEventMessage<?>>, TrackingToken> initialTokenBuilder() {
-        return StreamableMessageSource::createHeadToken;
+    static Map<String, Object> liveConsumerProperties(Map<String, Object> base) {
+        Map<String, Object> properties = new HashMap<>(base);
+        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        return properties;
     }
 
     @SuppressWarnings("unchecked")
-    private static StreamableMessageSource<TrackedEventMessage<?>> kafkaSource(
-            ApplicationContext applicationContext) {
-        return applicationContext.getBean(
-                AxonDistributedKafkaAutoConfiguration.STREAMABLE_SOURCE_BEAN_NAME,
-                StreamableMessageSource.class);
+    private static SubscribableKafkaMessageSource<String, byte[]> liveSource(
+            ApplicationContext applicationContext, MeterRegistry registry, String groupId) {
+        KafkaProperties kafka = applicationContext.getBean(KafkaProperties.class);
+        ConsumerFactory<String, byte[]> consumers =
+                new DefaultConsumerFactory<>(liveConsumerProperties(kafka.buildConsumerProperties()));
+        if (registry != null) {
+            consumers = new MeteredConsumerFactory<>(consumers, registry, Tags.of("source", "instance-scoped"));
+        }
+        return SubscribableKafkaMessageSource.<String, byte[]>builder()
+                .topics(List.of(kafka.getDefaultTopic()))
+                .groupId(groupId)
+                .consumerFactory(consumers)
+                .fetcher(applicationContext.getBean(FETCHER_BEAN, Fetcher.class))
+                .messageConverter(applicationContext.getBean(MESSAGE_CONVERTER_BEAN, KafkaMessageConverter.class))
+                .consumerCount(1)
+                .build();
     }
 
-    private static boolean isAnnotatedWith(Class<?> type, String expectedGroup) {
-        ProcessingGroup annotation = AnnotationUtils.findAnnotation(type, ProcessingGroup.class);
-        return annotation != null && expectedGroup.equals(annotation.value());
+    private static <T> Supplier<T> memoize(Supplier<T> supplier) {
+        return new Supplier<>() {
+            private T value;
+
+            @Override
+            public synchronized T get() {
+                if (value == null) {
+                    value = supplier.get();
+                }
+                return value;
+            }
+        };
     }
 
-    private static String instanceId(InstanceScopedProcessingGroupsProperties properties,
-                                     Environment environment) {
+    /** Consumer group Kafka de la source : {@code <application>.<instanceId>}, unique par pod et par service. */
+    static String consumerGroupId(InstanceScopedProcessingGroupsProperties properties, Environment environment) {
+        return environment.getProperty("spring.application.name", "joutio") + "." + instanceId(properties, environment);
+    }
+
+    private static String instanceId(InstanceScopedProcessingGroupsProperties properties, Environment environment) {
         String configured = properties.instanceId();
         if (configured != null && !configured.isBlank()) {
             return configured.trim();

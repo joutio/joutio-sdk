@@ -22,8 +22,8 @@ import java.util.stream.Collectors;
  *
  * <p>Enregistre la configuration par défaut de tous les processors, et une configuration par nom
  * pour chaque groupe de saga non segmenté (token initial en tête, cf. {@link TrackingProcessorDefaults}).
- * Les groupes segmentés et instance-scopés reçoivent les mêmes réglages dans leur propre
- * autoconfiguration.</p>
+ * Les groupes segmentés reçoivent les mêmes réglages dans leur propre autoconfiguration ; les groupes
+ * instance-scopés sont des subscribing processors, sans token ni ces réglages.</p>
  */
 @AutoConfiguration
 @EnableConfigurationProperties({

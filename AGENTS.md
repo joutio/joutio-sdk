@@ -53,7 +53,7 @@ Les services déclarent `joutio-microservice-core` (domain) et `joutio-microserv
 | `CommandGatewayRetryAutoConfiguration` | `joutio.axon.command-bus.max-retries` (3), `.retry-backoff` (100 ms) | `CommandGateway` qui réessaie les conflits de séquence et les échecs de routage, jamais un refus métier |
 | `CapabilityDiscoveryAutoConfiguration` | `joutio.axon.command-bus.capabilities-retention` (2 min) | capacités des membres du bus stables malgré un échec HTTP (remplace l'ignore-listing d'Axon) |
 | `TrackingProcessorDefaultsAutoConfiguration` | `joutio.axon.event-availability-timeout` (5 s) | réglages communs de tous les tracking processors ; token initial en tête pour les groupes `@Saga` |
-| `InstanceScopedProcessingGroupsAutoConfiguration` | `joutio.axon.instance-scoped-groups` | un token par instance (`<groupe>-<HOSTNAME>`), démarrage en queue de flux ; readiness `axonInstanceScopedProcessors` hors service tant qu'un de ces groupes n'a pas rattrapé le flux (verrouillée ensuite) |
+| `InstanceScopedProcessingGroupsAutoConfiguration` | `joutio.axon.instance-scoped-groups` | subscribing processors sur une source Kafka partagée par pod : un consumer, group `<application>.<HOSTNAME>`, fin du topic, aucun offset commité, aucun token |
 | `SegmentedProcessingGroupsAutoConfiguration` + `SegmentRebalancer` | `joutio.axon.processors.<groupe>.segments`, `joutio.axon.rebalance-interval` (30 s) | groupe global segmenté, un thread par segment ; répartition des segments entre répliques découvertes ; métriques `joutio.axon.rebalancer.*` |
 | `AxonConsole*AutoConfiguration` | `joutio.axon.console.*`, `joutio.axon.dlq.*` | DLQ, état des processors, API interne, agent vers `joutio-console` |
 | `AxonDistributedDeadlineAutoConfiguration` | `joutio.axon.deadline.threads` (4) | deadlines < 5 min en mémoire sur un pool de threads (Axon n'en prend qu'un), au-delà db-scheduler (`CombinedDeadlineManager`) |
@@ -97,8 +97,8 @@ Release par `lib-release.yml`. Une évolution du SDK suit la chaîne :
   `No node known to accept command`. Ne jamais créer d'autre `RestTemplate` dans une
   auto-configuration partagée.
 - **Processing groups** : chaque classe de handlers déclare `@ProcessingGroup` (kebab-case), sinon
-  le démarrage échoue. Un replay ciblé consiste à supprimer la ligne `token_entry` du groupe (toutes
-  les lignes suffixées pour un groupe instance-scopé).
+  le démarrage échoue. Un replay ciblé consiste à supprimer la ligne `token_entry` du groupe (un
+  groupe instance-scopé n'a pas de token et ne se rejoue pas).
 - **Partitions** : `Axon.Events` est déclaré à 1 partition (`joutio.axon.kafka.partitions`). Chaque
   segment lit toutes les partitions : en ajouter ne parallélise rien. Le parallélisme passe par
   `joutio.axon.processors` ([axon](../../docs/backend/axon.md#segments-et-répliques)).
@@ -128,5 +128,9 @@ Release par `lib-release.yml`. Une évolution du SDK suit la chaîne :
 - Jauges et intercepteurs de métriques Axon : les enregistrer sur `ApplicationReadyEvent`, jamais
   pendant l'initialisation d'Axon (NPE, cycles de beans).
 - Le format du bus de requêtes n'est pas rétrocompatible : déployer de façon coordonnée.
+- **Groupes instance-scopés** : leurs handlers tournent l'un après l'autre sur le thread de l'unique
+  consumer du pod. Ils restent non bloquants (envoi STOMP, appels asynchrones), sinon un handler lent
+  retarde tous les groupes. Pas de DLQ ni de replay : une exception est journalisée, l'événement
+  suivant est traité.
 - Un compteur métier passe par un port du domaine (ex. `GameMetricsPort`), implémenté en
   infrastructure avec `MeterRegistry`. Jamais de Micrometer dans `domain/`.
