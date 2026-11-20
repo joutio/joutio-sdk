@@ -1,5 +1,8 @@
 package com.joutio.axon.autoconfigure;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.axonframework.common.transaction.NoTransactionManager;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.Configuration;
@@ -40,6 +43,10 @@ import java.util.stream.Collectors;
  *
  * <p>Ne touche jamais l'état des événements : une libération attend la fin du lot en cours, et le
  * token reste dans le token store.</p>
+ *
+ * <p>Métriques, par groupe ({@code group}) : {@code joutio.axon.rebalancer.pass} (durée d'une passe,
+ * lecture du token store comprise), {@code joutio.axon.rebalancer.released} (segments libérés) et
+ * {@code joutio.axon.rebalancer.suspended} (suspensions du garde-fou).</p>
  */
 public class SegmentRebalancer implements SmartLifecycle {
 
@@ -51,6 +58,7 @@ public class SegmentRebalancer implements SmartLifecycle {
     private final ObjectProvider<DiscoveryClient> discoveryClient;
     private final String serviceId;
     private final Clock clock;
+    private final MeterRegistry registry;
     private final Map<String, Set<Integer>> released = new ConcurrentHashMap<>();
     private final Map<String, Instant> suspendedUntil = new ConcurrentHashMap<>();
     private ScheduledExecutorService executor;
@@ -58,19 +66,22 @@ public class SegmentRebalancer implements SmartLifecycle {
     public SegmentRebalancer(SegmentedProcessingGroupsProperties properties,
                              Configuration axonConfiguration,
                              ObjectProvider<DiscoveryClient> discoveryClient,
-                             String serviceId) {
-        this(properties, axonConfiguration, discoveryClient, serviceId, Clock.systemUTC());
+                             String serviceId,
+                             MeterRegistry registry) {
+        this(properties, axonConfiguration, discoveryClient, serviceId, registry, Clock.systemUTC());
     }
 
     SegmentRebalancer(SegmentedProcessingGroupsProperties properties,
                       Configuration axonConfiguration,
                       ObjectProvider<DiscoveryClient> discoveryClient,
                       String serviceId,
+                      MeterRegistry registry,
                       Clock clock) {
         this.properties = properties;
         this.axonConfiguration = axonConfiguration;
         this.discoveryClient = discoveryClient;
         this.serviceId = serviceId;
+        this.registry = registry;
         this.clock = clock;
     }
 
@@ -86,10 +97,16 @@ public class SegmentRebalancer implements SmartLifecycle {
                 .eventProcessor(group, TrackingEventProcessor.class)
                 .filter(TrackingEventProcessor::isRunning)
                 .ifPresent(processor -> {
+                    Timer.Sample sample = Timer.start(registry);
                     try {
                         rebalance(group, processor, instances);
                     } catch (RuntimeException e) {
                         logger.warn("Rééquilibrage en échec: groupe={} ({})", group, e.getMessage());
+                    } finally {
+                        sample.stop(Timer.builder("joutio.axon.rebalancer.pass")
+                                .description("Durée d'une passe du rééquilibreur de segments")
+                                .tag("group", group)
+                                .register(registry));
                     }
                 }));
     }
@@ -105,6 +122,8 @@ public class SegmentRebalancer implements SmartLifecycle {
                 TransactionManager.class, NoTransactionManager::instance);
         if (transactionManager.fetchInTransaction(() -> releasedButUnclaimed(group, tokenStore))) {
             suspendedUntil.put(group, now.plus(properties.rebalanceInterval().multipliedBy(SUSPENSION_INTERVALS)));
+            counter("joutio.axon.rebalancer.suspended", "Suspensions du rééquilibrage (segment libéré non repris)",
+                    group).increment();
             logger.warn("Rééquilibrage suspendu: groupe={}, segments libérés repris par aucune autre réplique "
                     + "({} répliques découvertes)", group, instances);
             return;
@@ -123,6 +142,12 @@ public class SegmentRebalancer implements SmartLifecycle {
                     group, segment, owned.size(), total, instances);
             processor.releaseSegment(segment, releaseMillis, TimeUnit.MILLISECONDS);
         });
+        counter("joutio.axon.rebalancer.released", "Segments libérés par le rééquilibreur", group)
+                .increment(releasing.size());
+    }
+
+    private Counter counter(String name, String description, String group) {
+        return Counter.builder(name).description(description).tag("group", group).register(registry);
     }
 
     /**

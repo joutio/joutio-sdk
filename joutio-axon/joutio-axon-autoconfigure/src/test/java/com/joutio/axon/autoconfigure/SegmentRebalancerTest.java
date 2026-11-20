@@ -1,5 +1,7 @@
 package com.joutio.axon.autoconfigure;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.axonframework.common.transaction.NoTransactionManager;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.Configuration;
@@ -78,10 +80,13 @@ class SegmentRebalancerTest {
         TrackingEventProcessor processor = runningProcessorOwning(0, 1, 2, 3);
         MutableClock clock = new MutableClock();
         TokenStore tokenStore = tokenStore(4);
-        SegmentRebalancer rebalancer = rebalancer(processor, tokenStore, 2, clock);
+        MeterRegistry registry = new SimpleMeterRegistry();
+        SegmentRebalancer rebalancer = rebalancer(processor, tokenStore, 2, clock, registry);
 
         rebalancer.rebalance();
         verify(processor, times(2)).releaseSegment(anyInt(), anyLong(), eq(TimeUnit.MILLISECONDS));
+        assertThat(registry.get("joutio.axon.rebalancer.released").tag("group", GROUP).counter().count())
+                .isEqualTo(2.0);
 
         // Personne n'a repris les segments libérés : ils restent disponibles.
         when(tokenStore.fetchAvailableSegments(GROUP)).thenReturn(List.of(Segment.computeSegment(0, 0, 1, 2, 3)));
@@ -91,6 +96,10 @@ class SegmentRebalancerTest {
         rebalancer.rebalance();
 
         verify(processor, times(2)).releaseSegment(anyInt(), anyLong(), eq(TimeUnit.MILLISECONDS));
+        assertThat(registry.get("joutio.axon.rebalancer.suspended").tag("group", GROUP).counter().count())
+                .isEqualTo(1.0);
+        assertThat(registry.get("joutio.axon.rebalancer.pass").tag("group", GROUP).timer().count())
+                .isEqualTo(3);
 
         // Fin de suspension : le rééquilibrage reprend.
         clock.advance(Duration.ofSeconds(30L * SegmentRebalancer.SUSPENSION_INTERVALS));
@@ -135,9 +144,14 @@ class SegmentRebalancerTest {
         return rebalancer(processor, tokenStore(totalSegments), instances, new MutableClock());
     }
 
-    @SuppressWarnings("unchecked")
     private static SegmentRebalancer rebalancer(TrackingEventProcessor processor, TokenStore tokenStore,
                                                 int instances, Clock clock) {
+        return rebalancer(processor, tokenStore, instances, clock, new SimpleMeterRegistry());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static SegmentRebalancer rebalancer(TrackingEventProcessor processor, TokenStore tokenStore,
+                                                int instances, Clock clock, MeterRegistry registry) {
         int totalSegments = tokenStore.fetchSegments(GROUP).length;
         EventProcessingConfiguration eventProcessing = mock(EventProcessingConfiguration.class);
         when(eventProcessing.eventProcessor(GROUP, TrackingEventProcessor.class)).thenReturn(Optional.of(processor));
@@ -156,7 +170,7 @@ class SegmentRebalancerTest {
         SegmentedProcessingGroupsProperties properties = new SegmentedProcessingGroupsProperties(
                 Map.of(GROUP, new SegmentedProcessingGroupsProperties.Processor(totalSegments)),
                 Duration.ofSeconds(30));
-        return new SegmentRebalancer(properties, configuration, provider, "joutio-matchmaking", clock);
+        return new SegmentRebalancer(properties, configuration, provider, "joutio-matchmaking", registry, clock);
     }
 
     private static final class MutableClock extends Clock {

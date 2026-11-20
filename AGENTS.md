@@ -49,12 +49,12 @@ Les services déclarent `joutio-microservice-core` (domain) et `joutio-microserv
 | `WebSocketAutoConfiguration` | `microservice.websocket.*` | STOMP/SockJS, JWT au `CONNECT`, heartbeats 10 s |
 | `CorsAutoConfiguration`, `SwaggerAutoConfiguration`, `ActuatorAutoConfiguration`, `ExceptionAutoConfiguration` | `microservice.*.enabled` | CORS, OpenAPI, Actuator, handler RFC 7807 + intercepteurs Axon |
 | `ObservabilityAutoConfiguration` + `ObservabilityEnvironmentPostProcessor` | `microservice.observability.*` | Prometheus, tags `application`/`environment`/`version`, logs JSON ECS, tracing OTLP (désactivé par défaut) |
-| `AxonDistributed*AutoConfiguration` | `axon.distributed.*` (défauts du SDK) | bus de requêtes distribué, transport Kafka, enregistrement local, heartbeat, tracing et métriques Axon |
+| `AxonDistributed*AutoConfiguration` | `axon.distributed.*` (défauts du SDK) | bus de requêtes distribué, transport Kafka, enregistrement local, heartbeat, tracing et métriques Axon (bus, processors, segments réclamés, consumers Kafka de la source via `MeteredConsumerFactory`) |
 | `CommandGatewayRetryAutoConfiguration` | `joutio.axon.command-bus.max-retries` (3), `.retry-backoff` (100 ms) | `CommandGateway` qui réessaie les conflits de séquence et les échecs de routage, jamais un refus métier |
 | `CapabilityDiscoveryAutoConfiguration` | `joutio.axon.command-bus.capabilities-retention` (2 min) | capacités des membres du bus stables malgré un échec HTTP (remplace l'ignore-listing d'Axon) |
 | `TrackingProcessorDefaultsAutoConfiguration` | `joutio.axon.event-availability-timeout` (5 s) | réglages communs de tous les tracking processors ; token initial en tête pour les groupes `@Saga` |
 | `InstanceScopedProcessingGroupsAutoConfiguration` | `joutio.axon.instance-scoped-groups` | un token par instance (`<groupe>-<HOSTNAME>`), démarrage en queue de flux |
-| `SegmentedProcessingGroupsAutoConfiguration` + `SegmentRebalancer` | `joutio.axon.processors.<groupe>.segments`, `joutio.axon.rebalance-interval` (30 s) | groupe global segmenté, un thread par segment ; répartition des segments entre répliques découvertes |
+| `SegmentedProcessingGroupsAutoConfiguration` + `SegmentRebalancer` | `joutio.axon.processors.<groupe>.segments`, `joutio.axon.rebalance-interval` (30 s) | groupe global segmenté, un thread par segment ; répartition des segments entre répliques découvertes ; métriques `joutio.axon.rebalancer.*` |
 | `AxonConsole*AutoConfiguration` | `joutio.axon.console.*`, `joutio.axon.dlq.*` | DLQ, état des processors, API interne, agent vers `joutio-console` |
 | `AxonDistributedDeadlineAutoConfiguration` | `joutio.axon.deadline.threads` (4) | deadlines < 5 min en mémoire sur un pool de threads (Axon n'en prend qu'un), au-delà db-scheduler (`CombinedDeadlineManager`) |
 | `AxonEventStoreErasureService` | — | effacement RGPD dans l'event store (payloads `bytea`, testé sur le vrai schéma) |

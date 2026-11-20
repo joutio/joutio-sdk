@@ -1,5 +1,7 @@
 package com.joutio.axon.autoconfigure;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Metrics;
 import org.axonframework.config.ConfigurerModule;
 import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.springframework.beans.factory.ObjectProvider;
@@ -53,7 +55,9 @@ public class SegmentedProcessingGroupsAutoConfiguration {
             SegmentedProcessingGroupsProperties properties,
             org.axonframework.config.Configuration axonConfiguration,
             ObjectProvider<DiscoveryClient> discoveryClient,
+            ObjectProvider<MeterRegistry> registry,
             @Value("${spring.application.name:axon-distributed-application}") String serviceId) {
-        return new SegmentRebalancer(properties, axonConfiguration, discoveryClient, serviceId);
+        return new SegmentRebalancer(properties, axonConfiguration, discoveryClient, serviceId,
+                registry.getIfAvailable(() -> Metrics.globalRegistry));
     }
 }

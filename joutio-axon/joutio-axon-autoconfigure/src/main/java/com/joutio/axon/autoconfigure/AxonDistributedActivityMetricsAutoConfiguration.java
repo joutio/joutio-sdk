@@ -1,15 +1,20 @@
 package com.joutio.axon.autoconfigure;
 
 import com.joutio.axon.autoconfigure.metrics.MessageMetricsHandlerInterceptor;
+import com.joutio.axon.autoconfigure.metrics.MeteredConsumerFactory;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.axonframework.config.Configuration;
 import org.axonframework.config.Configurer;
 import org.axonframework.config.ConfigurerModule;
 import org.axonframework.eventhandling.EventMessage;
+import org.axonframework.eventhandling.StreamingEventProcessor;
+import org.axonframework.eventhandling.TrackingEventProcessor;
+import org.axonframework.extensions.kafka.eventhandling.consumer.ConsumerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -25,7 +30,12 @@ import org.springframework.context.annotation.Bean;
  * <ul>
  *     <li>{@code joutio.axon.events.processed} + {@code joutio.axon.event.duration} — interceptor
  *     de traitement d'événements, enregistré via {@link ConfigurerModule} (temps de configuration Axon) ;</li>
- *     <li>{@code joutio.axon.event.processor.running|error} — jauges d'état des processors.</li>
+ *     <li>{@code joutio.axon.event.processor.running|error} — jauges d'état des processors ;</li>
+ *     <li>{@code joutio.axon.segments.claimed}, {@code joutio.axon.processor.capacity} et
+ *     {@code joutio.axon.processor.threads} — segments réclamés par ce pod, threads configurés et
+ *     threads actifs de chaque processor streaming ;</li>
+ *     <li>{@code joutio.axon.kafka.consumers.*} et {@code kafka_consumer_*} — consumers Kafka de la
+ *     source Axon ({@link MeteredConsumerFactory}).</li>
  * </ul>
  *
  * <p>Les intercepteurs des <b>bus</b> (commandes, requêtes, publication d'événements) ne sont
@@ -56,6 +66,25 @@ public class AxonDistributedActivityMetricsAutoConfiguration {
         return configurer -> configurer.eventProcessing().registerDefaultHandlerInterceptor(
                 (configuration, processorName) -> new MessageMetricsHandlerInterceptor<EventMessage<?>>(
                         registry, "joutio.axon.events.processed", "joutio.axon.event.duration", processorName));
+    }
+
+    /**
+     * Décore la {@link ConsumerFactory} de l'extension Axon Kafka pour mesurer chaque consumer.
+     * Statique : un {@link BeanPostProcessor} ne doit pas forcer l'instanciation de sa configuration.
+     */
+    @Bean
+    public static BeanPostProcessor joutioAxonKafkaConsumerMetrics(ObjectProvider<MeterRegistry> registries) {
+        return new BeanPostProcessor() {
+            @Override
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            public Object postProcessAfterInitialization(Object bean, String beanName) {
+                if (bean instanceof ConsumerFactory factory && !(bean instanceof MeteredConsumerFactory)) {
+                    MeterRegistry registry = registries.getIfAvailable();
+                    return registry == null ? bean : new MeteredConsumerFactory<>(factory, registry);
+                }
+                return bean;
+            }
+        };
     }
 
     /**
@@ -90,6 +119,22 @@ public class AxonDistributedActivityMetricsAutoConfiguration {
                     .description("Event processor en erreur")
                     .tag("processor", name)
                     .register(registry);
+            if (processor instanceof StreamingEventProcessor streaming) {
+                Gauge.builder("joutio.axon.segments.claimed", streaming, p -> p.processingStatus().size())
+                        .description("Segments réclamés par ce pod")
+                        .tag("processor", name)
+                        .register(registry);
+                Gauge.builder("joutio.axon.processor.capacity", streaming, StreamingEventProcessor::maxCapacity)
+                        .description("Threads configurés (segments traitables en parallèle)")
+                        .tag("processor", name)
+                        .register(registry);
+            }
+            if (processor instanceof TrackingEventProcessor tracking) {
+                Gauge.builder("joutio.axon.processor.threads", tracking, TrackingEventProcessor::activeProcessorThreads)
+                        .description("Threads actifs du processor")
+                        .tag("processor", name)
+                        .register(registry);
+            }
         });
         logger.info("Axon event processor gauges registered ({})",
                 configuration.eventProcessingConfiguration().eventProcessors().size());
