@@ -1,3 +1,13 @@
+## [3.0.0](https://github.com/joutio/joutio-sdk/compare/v2.4.1...v3.0.0) (2026-11-23)
+
+### ⚠ BREAKING CHANGES
+
+* move EventEnvelope to the event package
+
+### Features
+
+* move EventEnvelope to the event package ([ac7a7ba](https://github.com/joutio/joutio-sdk/commit/ac7a7badc3cfbaa32d75f8ba33ca32294a99d129))
+
 ## [2.4.1](https://github.com/joutio/joutio-sdk/compare/v2.4.0...v2.4.1) (2026-11-20)
 
 ### Bug Fixes

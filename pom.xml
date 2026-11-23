@@ -6,7 +6,7 @@
 
     <groupId>com.joutio</groupId>
     <artifactId>joutio-sdk</artifactId>
-    <version>2.4.1-SNAPSHOT</version>
+    <version>3.0.0</version>
     <packaging>pom</packaging>
 
     <name>joutio-sdk</name>
