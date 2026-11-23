@@ -1,4 +1,4 @@
-package com.joutio.microservice.core.domain.model.notification;
+package com.joutio.microservice.core.domain.model.event;
 
 import java.io.Serializable;
 import java.time.Instant;

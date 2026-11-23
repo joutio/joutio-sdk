@@ -32,7 +32,7 @@ Les services déclarent `joutio-microservice-core` (domain) et `joutio-microserv
 - `Language` (`fr`/`en`, ISO 639-1, désérialisation stricte).
 - Recherche : `SearchRequest`, `FilterRequest`, `SortRequest`, `PageRequest` → `SearchResponse<T>`
   (REST et bus), `@Searchable`, `FieldType`, `FilterOperator`.
-- `EventEnvelope` : `aggregateId`, `sequenceNumber`, `timestamp`, `eventType`, `payload`. Le codec
+- `EventEnvelope` (`domain.model.event`) : `aggregateId`, `sequenceNumber`, `timestamp`, `eventType`, `payload`. Le codec
   `EventEnvelopeModule` ne sert qu'au sérialiseur du bus de requêtes distribué et n'accepte que des
   types `com.joutio.` (fail-closed).
 - `QueryResponseTypes` : seule fabrique des `ResponseType` (`instanceOf`, `optionalInstanceOf`,
