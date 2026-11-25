@@ -1,3 +1,9 @@
+## [3.3.0](https://github.com/joutio/joutio-sdk/compare/v3.2.0...v3.3.0) (2026-11-25)
+
+### Features
+
+* **axon:** local processing groups on the embedded event bus ([028639d](https://github.com/joutio/joutio-sdk/commit/028639de6061d979dec22c84975487cceae53422))
+
 ## [3.2.0](https://github.com/joutio/joutio-sdk/compare/v3.1.0...v3.2.0) (2026-11-25)
 
 ### Features
