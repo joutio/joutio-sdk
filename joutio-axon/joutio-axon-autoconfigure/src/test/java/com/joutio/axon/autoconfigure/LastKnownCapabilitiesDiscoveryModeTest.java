@@ -28,7 +28,7 @@ class LastKnownCapabilitiesDiscoveryModeTest {
     private final CapabilityDiscoveryMode delegate = mock(CapabilityDiscoveryMode.class);
     private final MutableClock clock = new MutableClock();
     private final LastKnownCapabilitiesDiscoveryMode mode =
-            new LastKnownCapabilitiesDiscoveryMode(delegate, Duration.ofMinutes(2), clock);
+            new LastKnownCapabilitiesDiscoveryMode(delegate, Duration.ofMinutes(2), new LocalCommandCapabilities(), clock);
 
     @Test
     void clientError_keepsLastKnownCapabilities() {

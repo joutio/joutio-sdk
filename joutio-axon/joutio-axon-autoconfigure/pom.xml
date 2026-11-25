@@ -26,6 +26,24 @@
         </dependency>
 
         <dependency>
+            <groupId>com.joutio</groupId>
+            <artifactId>joutio-axon-grpc</artifactId>
+        </dependency>
+
+        <!-- Sécurité du bus gRPC : jeton M2M sortant, JwtDecoder entrant. Fournis à l'exécution par
+             joutio-microservice-autoconfigure (ResourceServerAutoConfiguration). -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-client</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>

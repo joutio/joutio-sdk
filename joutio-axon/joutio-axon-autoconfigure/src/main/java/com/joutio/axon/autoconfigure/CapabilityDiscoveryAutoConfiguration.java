@@ -24,7 +24,14 @@ public class CapabilityDiscoveryAutoConfiguration {
     @Primary
     @ConditionalOnProperty(value = "axon.distributed.spring-cloud.mode", havingValue = "rest", matchIfMissing = true)
     public CapabilityDiscoveryMode lastKnownCapabilityDiscoveryMode(RestCapabilityDiscoveryMode restCapabilityDiscoveryMode,
-                                                                    CommandBusResilienceProperties properties) {
-        return new LastKnownCapabilitiesDiscoveryMode(restCapabilityDiscoveryMode, properties.capabilitiesRetention());
+                                                                    CommandBusResilienceProperties properties,
+                                                                    LocalCommandCapabilities localCommandCapabilities) {
+        return new LastKnownCapabilitiesDiscoveryMode(restCapabilityDiscoveryMode, properties.capabilitiesRetention(),
+                localCommandCapabilities);
+    }
+
+    @Bean
+    public LocalCommandCapabilities localCommandCapabilities() {
+        return new LocalCommandCapabilities();
     }
 }

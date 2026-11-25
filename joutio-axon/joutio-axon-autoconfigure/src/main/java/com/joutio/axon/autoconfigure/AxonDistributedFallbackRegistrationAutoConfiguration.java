@@ -22,11 +22,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.util.StringUtils;
 
-import java.net.InetAddress;
 import java.net.URI;
-import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -62,9 +59,8 @@ public class AxonDistributedFallbackRegistrationAutoConfiguration {
     public Registration axonDistributedFallbackRegistration(
             Environment environment,
             @Value("${spring.application.name:axon-distributed-application}") String serviceId,
-            @Value("${server.address:}") String configuredHost,
             @Value("${server.port:8080}") int port) {
-        String host = resolveLocalHost(environment, configuredHost);
+        String host = LocalAddress.resolve(environment);
         logger.info("Axon fallback Registration: serviceId={}, host={}, port={}", serviceId, host, port);
         return new SimpleRegistration(serviceId, host, port);
     }
@@ -83,36 +79,6 @@ public class AxonDistributedFallbackRegistrationAutoConfiguration {
     public FallbackRegistrationPublisher fallbackRegistrationPublisher(Registration registration,
                                                                        ApplicationEventPublisher publisher) {
         return new FallbackRegistrationPublisher(registration, publisher);
-    }
-
-    /**
-     * Adresse de l'instance locale : doit correspondre à celle annoncée par le
-     * {@code DiscoveryClient} pour que le routeur reconnaisse le nœud local (sinon il récupère
-     * ses capacités par HTTP et se déclare « incapable » au démarrage → {@code No node known to
-     * accept command}). En Kubernetes, la découverte renvoie l'IP du pod + le port d'endpoint :
-     * on utilise donc {@code spring.cloud.client.ip-address}. Ne pas se fier à la présence d'un
-     * {@code SimpleDiscoveryClient} : Spring Cloud Commons en crée toujours un, même en prod.
-     */
-    private String resolveLocalHost(Environment environment, String configuredHost) {
-        if (StringUtils.hasText(configuredHost)) {
-            return configuredHost;
-        }
-        boolean kubernetesDiscovery = environment.getProperty(
-                "spring.cloud.kubernetes.discovery.enabled", Boolean.class, false);
-        if (!kubernetesDiscovery) {
-            return "localhost";
-        }
-        String localIp = environment.getProperty("spring.cloud.client.ip-address");
-        if (StringUtils.hasText(localIp)) {
-            return localIp;
-        }
-        try {
-            return InetAddress.getLocalHost().getHostAddress();
-        } catch (UnknownHostException exception) {
-            logger.warn("Could not resolve local host address, falling back to localhost: {}",
-                    exception.getMessage());
-            return "localhost";
-        }
     }
 
     /**

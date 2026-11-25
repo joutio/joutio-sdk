@@ -18,7 +18,8 @@ public record ConsoleSnapshot(
         String instanceId,
         String address,
         long uptimeSeconds,
-        List<ProcessorSnapshot> processors
+        List<ProcessorSnapshot> processors,
+        List<MemberSnapshot> members
 ) {
 
     public static final String VERSION = "v1";
@@ -65,5 +66,21 @@ public record ConsoleSnapshot(
     }
 
     public record DlqStats(long size, long sequences) {
+    }
+
+    /**
+     * Membre du bus gRPC vu par ce pod, avec ses capacités ({@code joutio.membership.MembershipService}).
+     * Champ ajouté après la v1 : absent des agents plus anciens.
+     */
+    public record MemberSnapshot(
+            String clientId,
+            String componentName,
+            String endpoint,
+            boolean local,
+            int loadFactor,
+            List<String> commands,
+            List<String> queries,
+            Instant seenAt
+    ) {
     }
 }

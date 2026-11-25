@@ -38,22 +38,31 @@ public class LastKnownCapabilitiesDiscoveryMode implements CapabilityDiscoveryMo
     private final Duration retention;
     private final Clock clock;
     private final Map<InstanceKey, Known> known = new ConcurrentHashMap<>();
+    private final LocalCommandCapabilities localCommands;
 
-    public LastKnownCapabilitiesDiscoveryMode(CapabilityDiscoveryMode delegate, Duration retention) {
-        this(delegate, retention, Clock.systemUTC());
+    public LastKnownCapabilitiesDiscoveryMode(CapabilityDiscoveryMode delegate,
+                                              Duration retention,
+                                              LocalCommandCapabilities localCommands) {
+        this(delegate, retention, localCommands, Clock.systemUTC());
     }
 
-    LastKnownCapabilitiesDiscoveryMode(CapabilityDiscoveryMode delegate, Duration retention, Clock clock) {
+    LastKnownCapabilitiesDiscoveryMode(CapabilityDiscoveryMode delegate,
+                                       Duration retention,
+                                       LocalCommandCapabilities localCommands,
+                                       Clock clock) {
         this.delegate = delegate;
         this.retention = retention;
+        this.localCommands = localCommands;
         this.clock = clock;
     }
 
+    /** Les capacités locales sont aussi annoncées par le bus gRPC ({@link LocalCommandCapabilities}). */
     @Override
     public void updateLocalCapabilities(ServiceInstance localInstance,
                                         int loadFactor,
                                         CommandMessageFilter commandFilter) {
         delegate.updateLocalCapabilities(localInstance, loadFactor, commandFilter);
+        localCommands.update(loadFactor, commandFilter);
     }
 
     @Override

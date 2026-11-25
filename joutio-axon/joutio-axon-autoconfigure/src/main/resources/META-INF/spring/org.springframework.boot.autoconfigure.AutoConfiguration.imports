@@ -16,3 +16,4 @@ com.joutio.axon.autoconfigure.AxonConsoleAutoConfiguration
 com.joutio.axon.autoconfigure.AccountErasureAutoConfiguration
 com.joutio.axon.autoconfigure.CommandGatewayRetryAutoConfiguration
 com.joutio.axon.autoconfigure.CapabilityDiscoveryAutoConfiguration
+com.joutio.axon.autoconfigure.AxonGrpcAutoConfiguration

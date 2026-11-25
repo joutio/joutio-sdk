@@ -1,5 +1,6 @@
 package com.joutio.axon.console;
 
+import com.joutio.axon.grpc.membership.Membership;
 import org.axonframework.config.Configuration;
 import org.axonframework.config.EventProcessingConfiguration;
 import org.axonframework.config.SagaConfiguration;
@@ -50,15 +51,18 @@ public class ConsoleState {
     private final Environment environment;
     private final ObjectProvider<BuildProperties> buildProperties;
     private final JoutioAxonConsoleProperties properties;
+    private final ObjectProvider<Membership> membership;
 
     public ConsoleState(ObjectProvider<Configuration> configurationProvider,
                         Environment environment,
                         ObjectProvider<BuildProperties> buildProperties,
-                        JoutioAxonConsoleProperties properties) {
+                        JoutioAxonConsoleProperties properties,
+                        ObjectProvider<Membership> membership) {
         this.configurationProvider = configurationProvider;
         this.environment = environment;
         this.buildProperties = buildProperties;
         this.properties = properties;
+        this.membership = membership;
     }
 
     public EventProcessingConfiguration eventProcessing() {
@@ -84,7 +88,27 @@ public class ConsoleState {
                 instanceId(),
                 instanceAddress(),
                 ManagementFactory.getRuntimeMXBean().getUptime() / 1000,
-                processors);
+                processors,
+                members());
+    }
+
+    /** Membres du bus gRPC vus par ce pod et leurs capacités ; vide sans bus gRPC. */
+    public List<ConsoleSnapshot.MemberSnapshot> members() {
+        Membership current = membership.getIfAvailable();
+        if (current == null) {
+            return List.of();
+        }
+        return current.topology().members().stream()
+                .map(member -> new ConsoleSnapshot.MemberSnapshot(
+                        member.clientId(),
+                        member.componentName(),
+                        member.endpoint().toString(),
+                        member.local(),
+                        member.loadFactor(),
+                        member.commandNames().stream().sorted().toList(),
+                        member.queryNames().stream().sorted().toList(),
+                        member.seenAt()))
+                .toList();
     }
 
     public ConsoleSnapshot.ProcessorSnapshot processor(String name) {

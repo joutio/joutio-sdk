@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+// Capacités d'un pod du bus gRPC entre pods. Remplace OpenStream d'Axon Server : il n'y a pas de
+// serveur central, chaque pod interroge ses pairs découverts.
+package joutio.membership;
+
+import "command.proto";
+import "query.proto";
+
+option java_package = "com.joutio.axon.grpc.membership.proto";
+option java_multiple_files = true;
+option java_outer_classname = "MembershipProto";
+
+service MembershipService {
+  rpc Capabilities (CapabilitiesRequest) returns (MemberCapabilities);
+}
+
+message CapabilitiesRequest {
+  // Membre qui interroge (journaux du pod interrogé).
+  string client_id = 1;
+  string component_name = 2;
+}
+
+message MemberCapabilities {
+  string client_id = 1;
+  string component_name = 2;
+  // Vide quand le membre quitte le bus (arrêt gracieux) : ses pairs le retirent sans rétention.
+  repeated io.axoniq.axonserver.grpc.command.CommandSubscription commands = 3;
+  repeated io.axoniq.axonserver.grpc.query.QuerySubscription queries = 4;
+  bool leaving = 5;
+}

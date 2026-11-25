@@ -16,6 +16,7 @@
 
     <modules>
         <module>joutio-axon-query</module>
+        <module>joutio-axon-grpc</module>
         <module>joutio-axon-deadline</module>
         <module>joutio-axon-autoconfigure</module>
         <module>joutio-axon-starter</module>

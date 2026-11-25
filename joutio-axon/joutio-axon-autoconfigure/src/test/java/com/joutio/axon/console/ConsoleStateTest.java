@@ -126,7 +126,7 @@ class ConsoleStateTest {
         when(configuration.eventProcessingConfiguration()).thenReturn(eventProcessing);
         JoutioAxonConsoleProperties properties =
                 new JoutioAxonConsoleProperties(true, null, null, true, true, "test-instance");
-        return new ConsoleState(provider(configuration), environment, provider(null), properties);
+        return new ConsoleState(provider(configuration), environment, provider(null), properties, provider(null));
     }
 
     private static <T> ObjectProvider<T> provider(T value) {

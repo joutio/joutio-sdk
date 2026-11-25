@@ -10,6 +10,7 @@ import com.joutio.axon.console.JoutioAxonConsoleProperties;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.axonframework.commandhandling.CommandBus;
+import com.joutio.axon.grpc.membership.Membership;
 import org.axonframework.config.Configuration;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.eventhandling.EventProcessor;
@@ -62,8 +63,9 @@ public class AxonConsoleAutoConfiguration {
     public ConsoleState consoleState(ObjectProvider<Configuration> configurationProvider,
                                      Environment environment,
                                      ObjectProvider<BuildProperties> buildProperties,
-                                     JoutioAxonConsoleProperties properties) {
-        return new ConsoleState(configurationProvider, environment, buildProperties, properties);
+                                     JoutioAxonConsoleProperties properties,
+                                     ObjectProvider<Membership> membership) {
+        return new ConsoleState(configurationProvider, environment, buildProperties, properties, membership);
     }
 
     @Bean

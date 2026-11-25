@@ -37,6 +37,10 @@
         <axon.version>4.13.1</axon.version>
         <axon-kafka-extension.version>4.12.1</axon-kafka-extension.version>
         <axon-springcloud-extension.version>4.12.1</axon-springcloud-extension.version>
+        <!-- Alignées sur axonserver-connector-java (bus gRPC entre pods). -->
+        <grpc.version>1.76.0</grpc.version>
+        <protobuf.version>4.33.1</protobuf.version>
+        <protobuf-maven-plugin.version>3.10.2</protobuf-maven-plugin.version>
         <db-scheduler.version>16.12.0</db-scheduler.version>
 
         <commons-text.version>1.15.0</commons-text.version>
@@ -244,6 +248,16 @@
             </dependency>
             <dependency>
                 <groupId>com.joutio</groupId>
+                <artifactId>joutio-axon-grpc</artifactId>
+                <version>${joutio-sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-inprocess</artifactId>
+                <version>${grpc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.joutio</groupId>
                 <artifactId>joutio-axon-deadline</artifactId>
                 <version>${joutio-sdk.version}</version>
             </dependency>
@@ -268,6 +282,11 @@
     <build>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>io.github.ascopes</groupId>
+                    <artifactId>protobuf-maven-plugin</artifactId>
+                    <version>${protobuf-maven-plugin.version}</version>
+                </plugin>
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>

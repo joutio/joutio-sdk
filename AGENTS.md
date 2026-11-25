@@ -18,6 +18,7 @@ Package racine `com.joutio`. Une release publie tous les modules à la même ver
 | `joutio-microservice-autoconfigure` | auto-configurations Spring |
 | `joutio-microservice-starter` | point d'entrée des `*-infrastructure` (autoconfigure + `joutio-axon-starter`) |
 | `joutio-axon-{starter,autoconfigure,deadline,query}` | Axon distribué : bus de commandes et de requêtes, transport Kafka, deadlines, codec `EventEnvelope` |
+| `joutio-axon-grpc` | bus gRPC entre pods ([axon](../../docs/backend/axon.md#bus-grpc-entre-pods)) : serveur du pod, canaux vers les pairs, membership (`joutio.membership.MembershipService`, proto dans `src/main/protobuf`), sécurité M2M. Socle seulement : les bus passent encore par HTTP |
 | `joutio-axon-test` | `JoutioAxonMatchers` pour `AggregateTestFixture` |
 
 Les services déclarent `joutio-microservice-core` (domain) et `joutio-microservice-starter`
@@ -52,6 +53,7 @@ Les services déclarent `joutio-microservice-core` (domain) et `joutio-microserv
 | `AxonDistributed*AutoConfiguration` | `axon.distributed.*` (défauts du SDK) | bus de requêtes distribué, transport Kafka, enregistrement local, heartbeat, tracing et métriques Axon (bus, processors, segments réclamés, consumers Kafka de la source via `MeteredConsumerFactory`) |
 | `CommandGatewayRetryAutoConfiguration` | `joutio.axon.command-bus.max-retries` (3), `.retry-backoff` (100 ms) | `CommandGateway` qui réessaie les conflits de séquence et les échecs de routage, jamais un refus métier |
 | `CapabilityDiscoveryAutoConfiguration` | `joutio.axon.command-bus.capabilities-retention` (2 min) | capacités des membres du bus stables malgré un échec HTTP (remplace l'ignore-listing d'Axon) |
+| `AxonGrpcAutoConfiguration` | `joutio.axon.grpc.port` (8124), `.client-id` (`HOSTNAME`), `.membership-refresh` (10 s), `.capabilities-timeout` (3 s), `.capabilities-retention` (2 min), `.shutdown-grace` (10 s) | serveur gRPC du pod (threads virtuels), membres et capacités des pairs relus à chaque intervalle et à chaque heartbeat de découverte, JWT M2M `server-client` exigé ; jauge `joutio.axon.grpc.members` ; membres dans l'instantané console et `GET /internal/console/members` |
 | `TrackingProcessorDefaultsAutoConfiguration` | `joutio.axon.event-availability-timeout` (5 s) | réglages communs de tous les tracking processors ; token initial en tête pour les groupes `@Saga` |
 | `InstanceScopedProcessingGroupsAutoConfiguration` | `joutio.axon.instance-scoped-groups` | subscribing processors sur une source Kafka partagée par pod : un consumer, group `<application>.<HOSTNAME>`, fin du topic, aucun offset commité, aucun token |
 | `SegmentedProcessingGroupsAutoConfiguration` + `SegmentRebalancer` | `joutio.axon.processors.<groupe>.segments`, `joutio.axon.rebalance-interval` (30 s) | groupe global segmenté, un thread par segment ; répartition des segments entre répliques découvertes ; métriques `joutio.axon.rebalancer.*` |
@@ -120,6 +122,16 @@ Release par `lib-release.yml`. Une évolution du SDK suit la chaîne :
     `app.kubernetes.io/component=axon` ;
   - l'adresse du `Registration` local doit correspondre à l'instance découverte : `server.address`,
     sinon IP du pod, sinon `localhost`. Ne pas la déduire de la présence d'un `SimpleDiscoveryClient`.
+- **Port gRPC** : un pair n'est membre du bus que si sa découverte annonce `port.grpc`. En prod, c'est le port nommé
+  `grpc` (8124) du Service, publié par Spring Cloud Kubernetes ; en local, la métadonnée `[port.grpc]` de chaque
+  instance de `joutio-local.yml`, égale au `joutio.axon.grpc.port` de l'`application-local.yml` du service (ports
+  `1xxxx` = port HTTP + 10000). Un service ajouté sans ce port est invisible du bus.
+- **Identité gRPC** : le pod se reconnaît parmi ses pairs par son adresse (même règle que le `Registration` local,
+  `LocalAddress`) et se nomme `HOSTNAME`, sinon `<application>@<hôte>:<port>`. Ses pairs adoptent le nom qu'il renvoie
+  par `Capabilities` : jamais deux noms pour un même pod.
+- **Jeton M2M du bus gRPC** : le serveur n'accepte que le sujet du client `server-client` ; un jeton de joueur est
+  refusé (`UNAUTHENTICATED`). En local, identity signe avec une clé éphémère : après son redémarrage, les jetons en
+  cache des autres services sont refusés (bus HTTP comme gRPC) ; relancer toute la stack.
 - `include-not-ready-addresses=true` : sans lui, un pod en démarrage n'est pas dans ses propres
   Endpoints et son seeder échoue (verrouillé par `SpringCloudCommandRouterLocalMemberTest`).
 - `SimpleDiscoveryClient` n'émet pas de heartbeat : le SDK en ré-émet un toutes les 10 s pour

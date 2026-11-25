@@ -74,6 +74,12 @@ public class ConsoleController {
         return state.lag(processor);
     }
 
+    /** Membres du bus gRPC vus par ce pod, avec leurs capacités. */
+    @GetMapping("/members")
+    public List<ConsoleSnapshot.MemberSnapshot> members() {
+        return state.members();
+    }
+
     /** Commandes en vol par type (contenu natif « long-running commands ») — diagnostic seul. */
     @GetMapping("/commands/in-flight")
     public List<CommandActivityTracker.InFlightCommand> inFlightCommands() {
