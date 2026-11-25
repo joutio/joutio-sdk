@@ -1,3 +1,9 @@
+## [3.2.0](https://github.com/joutio/joutio-sdk/compare/v3.1.0...v3.2.0) (2026-11-25)
+
+### Features
+
+* **axon:** gRPC query bus with subscription queries ([aea1e73](https://github.com/joutio/joutio-sdk/commit/aea1e73fa26d4caa57a7157e135d6ba379109112))
+
 ## [3.1.0](https://github.com/joutio/joutio-sdk/compare/v3.0.0...v3.1.0) (2026-11-25)
 
 ### Features
