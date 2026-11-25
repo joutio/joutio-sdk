@@ -1,3 +1,9 @@
+## [3.1.0](https://github.com/joutio/joutio-sdk/compare/v3.0.0...v3.1.0) (2026-11-25)
+
+### Features
+
+* **axon:** gRPC bus foundation between pods ([9d5076f](https://github.com/joutio/joutio-sdk/commit/9d5076fc216c7339452a69cb9b8568b14d4d905a))
+
 ## [3.0.0](https://github.com/joutio/joutio-sdk/compare/v2.4.1...v3.0.0) (2026-11-23)
 
 ### ⚠ BREAKING CHANGES
