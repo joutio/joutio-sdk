@@ -6,12 +6,18 @@ import com.joutio.axon.grpc.membership.Membership;
 import com.joutio.axon.grpc.membership.proto.CapabilitiesRequest;
 import com.joutio.axon.grpc.membership.proto.MemberCapabilities;
 import com.joutio.axon.grpc.membership.proto.MembershipServiceGrpc;
+import com.joutio.axon.grpc.query.GrpcDistributedQueryBus;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joutio.axon.grpc.security.BearerTokenClientInterceptor;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import org.axonframework.commandhandling.distributed.commandfilter.CommandNameFilter;
+import org.axonframework.queryhandling.QueryBus;
+import org.axonframework.queryhandling.SimpleQueryBus;
+import org.axonframework.serialization.AnnotationRevisionResolver;
+import org.axonframework.serialization.RevisionResolver;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -54,7 +60,10 @@ class AxonGrpcAutoConfigurationTest {
                             .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                             .tokenUri("http://localhost/oauth2/token")
                             .build()))
-            .withBean(OAuth2AuthorizedClientManager.class, () -> mock(OAuth2AuthorizedClientManager.class));
+            .withBean(OAuth2AuthorizedClientManager.class, () -> mock(OAuth2AuthorizedClientManager.class))
+            .withBean("localSegment", QueryBus.class, () -> SimpleQueryBus.builder().build())
+            .withBean(AxonObjectMapperAutoConfiguration.AXON_OBJECT_MAPPER, ObjectMapper.class, ObjectMapper::new)
+            .withBean(RevisionResolver.class, AnnotationRevisionResolver::new);
 
     @Test
     void names_the_local_member_after_the_pod_and_its_discovered_address() {
@@ -84,6 +93,9 @@ class AxonGrpcAutoConfigurationTest {
                     return commands;
                 })
                 .run(context -> {
+                    GrpcDistributedQueryBus queryBus = context.getBean(GrpcDistributedQueryBus.class);
+                    queryBus.subscribe("GetGameQuery", String.class, message -> "game");
+                    assertThat(context.getBean(QueryBus.class)).isSameAs(queryBus);
                     int port = context.getBean(GrpcServer.class).port();
                     withChannel(port, "m2m", channel -> {
                         MemberCapabilities capabilities = MembershipServiceGrpc.newBlockingStub(channel)
@@ -92,6 +104,8 @@ class AxonGrpcAutoConfigurationTest {
                         assertThat(capabilities.getCommandsList())
                                 .extracting(command -> command.getCommand() + "/" + command.getLoadFactor())
                                 .containsExactly("AnswerQuestionCommand/100", "StartGameCommand/100");
+                        assertThat(capabilities.getQueriesList()).extracting(query -> query.getQuery())
+                                .containsExactly("GetGameQuery");
                     });
                     for (String refused : new String[]{"player", "forged"}) {
                         withChannel(port, refused, channel -> assertThatThrownBy(() -> MembershipServiceGrpc

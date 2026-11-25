@@ -1,6 +1,5 @@
 package com.joutio.axon.grpc;
 
-import com.joutio.axon.grpc.membership.MembershipGrpcService;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import org.slf4j.Logger;
@@ -15,21 +14,22 @@ import java.util.concurrent.TimeUnit;
 /**
  * Serveur gRPC du pod : services du bus et {@code MembershipService}.
  *
- * <p>Arrêt gracieux : le pod annonce son départ ({@code leaving}), n'accepte plus de nouvel appel,
- * laisse finir les appels en cours pendant {@code shutdownGrace}, puis coupe le reste.</p>
+ * <p>Arrêt gracieux : le pod annonce son départ ({@code leaving}) et termine ses abonnements en
+ * {@code complete_exceptionally} ({@code leave}), n'accepte plus de nouvel appel, laisse finir les appels en
+ * cours pendant {@code shutdownGrace}, puis coupe le reste.</p>
  */
 public class GrpcServer implements SmartLifecycle {
 
     private static final Logger logger = LoggerFactory.getLogger(GrpcServer.class);
 
     private final ServerBuilder<?> builder;
-    private final MembershipGrpcService membershipService;
+    private final Runnable leave;
     private final Duration shutdownGrace;
     private volatile Server server;
 
-    public GrpcServer(ServerBuilder<?> builder, MembershipGrpcService membershipService, Duration shutdownGrace) {
+    public GrpcServer(ServerBuilder<?> builder, Runnable leave, Duration shutdownGrace) {
         this.builder = builder;
-        this.membershipService = membershipService;
+        this.leave = leave;
         this.shutdownGrace = shutdownGrace;
     }
 
@@ -49,7 +49,7 @@ public class GrpcServer implements SmartLifecycle {
         if (current == null) {
             return;
         }
-        membershipService.leave();
+        leave.run();
         current.shutdown();
         try {
             if (!current.awaitTermination(shutdownGrace.toMillis(), TimeUnit.MILLISECONDS)) {

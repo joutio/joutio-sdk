@@ -15,10 +15,6 @@
     <packaging>jar</packaging>
 
     <dependencies>
-        <dependency>
-            <groupId>com.joutio</groupId>
-            <artifactId>joutio-axon-query</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>com.joutio</groupId>

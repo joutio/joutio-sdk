@@ -15,6 +15,8 @@ import java.time.Duration;
  * @param capabilitiesRetention durée pendant laquelle un pair encore découvert mais illisible garde ses
  *                              dernières capacités (2 min)
  * @param shutdownGrace         délai laissé aux appels en cours à l'arrêt (10 s)
+ * @param queryTimeout          délai d'une requête envoyée à un pair, et de l'ouverture d'un abonnement (10 s) ;
+ *                              porté par l'instruction {@code TIMEOUT} et la deadline gRPC
  */
 @ConfigurationProperties(prefix = "joutio.axon.grpc")
 public record AxonGrpcProperties(Integer port,
@@ -22,7 +24,8 @@ public record AxonGrpcProperties(Integer port,
                                  Duration membershipRefresh,
                                  Duration capabilitiesTimeout,
                                  Duration capabilitiesRetention,
-                                 Duration shutdownGrace) {
+                                 Duration shutdownGrace,
+                                 Duration queryTimeout) {
 
     public static final int DEFAULT_PORT = 8124;
 
@@ -32,5 +35,6 @@ public record AxonGrpcProperties(Integer port,
         capabilitiesTimeout = capabilitiesTimeout == null ? Duration.ofSeconds(3) : capabilitiesTimeout;
         capabilitiesRetention = capabilitiesRetention == null ? Duration.ofMinutes(2) : capabilitiesRetention;
         shutdownGrace = shutdownGrace == null ? Duration.ofSeconds(10) : shutdownGrace;
+        queryTimeout = queryTimeout == null ? Duration.ofSeconds(10) : queryTimeout;
     }
 }

@@ -1,4 +1,4 @@
-package com.joutio.axon.query.message;
+package com.joutio.axon.grpc.query;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;

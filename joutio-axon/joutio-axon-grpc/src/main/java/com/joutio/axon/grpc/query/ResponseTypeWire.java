@@ -1,4 +1,4 @@
-package com.joutio.axon.query.message;
+package com.joutio.axon.grpc.query;
 
 import org.axonframework.messaging.responsetypes.OptionalResponseType;
 import org.axonframework.messaging.responsetypes.ResponseType;

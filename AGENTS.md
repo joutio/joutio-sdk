@@ -17,8 +17,8 @@ Package racine `com.joutio`. Une release publie tous les modules à la même ver
 | `joutio-microservice-core` | types techniques partagés, dépendance des `*-domain` |
 | `joutio-microservice-autoconfigure` | auto-configurations Spring |
 | `joutio-microservice-starter` | point d'entrée des `*-infrastructure` (autoconfigure + `joutio-axon-starter`) |
-| `joutio-axon-{starter,autoconfigure,deadline,query}` | Axon distribué : bus de commandes et de requêtes, transport Kafka, deadlines, codec `EventEnvelope` |
-| `joutio-axon-grpc` | bus gRPC entre pods ([axon](../../docs/backend/axon.md#bus-grpc-entre-pods)) : serveur du pod, canaux vers les pairs, membership (`joutio.membership.MembershipService`, proto dans `src/main/protobuf`), sécurité M2M. Socle seulement : les bus passent encore par HTTP |
+| `joutio-axon-{starter,autoconfigure,deadline}` | Axon distribué : bus de commandes (axon-springcloud), transport Kafka, deadlines |
+| `joutio-axon-grpc` | bus gRPC entre pods ([axon](../../docs/backend/axon.md#bus-grpc-entre-pods)) : serveur du pod, canaux vers les pairs, membership (`joutio.membership.MembershipService`, proto dans `src/main/protobuf`), sécurité M2M, bus de requêtes (`GrpcDistributedQueryBus` côté dispatcher, `QueryGrpcService` côté fournisseur, `QueryCodec` et codec `EventEnvelopeModule`). Les commandes passent encore par axon-springcloud |
 | `joutio-axon-test` | `JoutioAxonMatchers` pour `AggregateTestFixture` |
 
 Les services déclarent `joutio-microservice-core` (domain) et `joutio-microservice-starter`
@@ -34,7 +34,7 @@ Les services déclarent `joutio-microservice-core` (domain) et `joutio-microserv
 - Recherche : `SearchRequest`, `FilterRequest`, `SortRequest`, `PageRequest` → `SearchResponse<T>`
   (REST et bus), `@Searchable`, `FieldType`, `FilterOperator`.
 - `EventEnvelope` (`domain.model.event`) : `aggregateId`, `sequenceNumber`, `timestamp`, `eventType`, `payload`. Le codec
-  `EventEnvelopeModule` ne sert qu'au sérialiseur du bus de requêtes distribué et n'accepte que des
+  `EventEnvelopeModule` (`joutio-axon-grpc`) ne sert qu'au sérialiseur du bus de requêtes et n'accepte que des
   types `com.joutio.` (fail-closed).
 - `QueryResponseTypes` : seule fabrique des `ResponseType` (`instanceOf`, `optionalInstanceOf`,
   `multipleInstancesOf`, `searchResponseOf`). `multipleInstancesOf` règle le cas
@@ -50,10 +50,10 @@ Les services déclarent `joutio-microservice-core` (domain) et `joutio-microserv
 | `WebSocketAutoConfiguration` | `microservice.websocket.*` | STOMP/SockJS, JWT au `CONNECT`, heartbeats 10 s |
 | `CorsAutoConfiguration`, `SwaggerAutoConfiguration`, `ActuatorAutoConfiguration`, `ExceptionAutoConfiguration` | `microservice.*.enabled` | CORS, OpenAPI, Actuator, handler RFC 7807 + intercepteurs Axon |
 | `ObservabilityAutoConfiguration` + `ObservabilityEnvironmentPostProcessor` | `microservice.observability.*` | Prometheus, tags `application`/`environment`/`version`, logs JSON ECS, tracing OTLP (désactivé par défaut) |
-| `AxonDistributed*AutoConfiguration` | `axon.distributed.*` (défauts du SDK) | bus de requêtes distribué, transport Kafka, enregistrement local, heartbeat, tracing et métriques Axon (bus, processors, segments réclamés, consumers Kafka de la source via `MeteredConsumerFactory`) |
+| `AxonDistributed*AutoConfiguration` | `axon.distributed.*` (défauts du SDK) | transport Kafka, enregistrement local, heartbeat, tracing et métriques Axon (bus, processors, segments réclamés, consumers Kafka de la source via `MeteredConsumerFactory`) |
 | `CommandGatewayRetryAutoConfiguration` | `joutio.axon.command-bus.max-retries` (3), `.retry-backoff` (100 ms) | `CommandGateway` qui réessaie les conflits de séquence et les échecs de routage, jamais un refus métier |
 | `CapabilityDiscoveryAutoConfiguration` | `joutio.axon.command-bus.capabilities-retention` (2 min) | capacités des membres du bus stables malgré un échec HTTP (remplace l'ignore-listing d'Axon) |
-| `AxonGrpcAutoConfiguration` | `joutio.axon.grpc.port` (8124), `.client-id` (`HOSTNAME`), `.membership-refresh` (10 s), `.capabilities-timeout` (3 s), `.capabilities-retention` (2 min), `.shutdown-grace` (10 s) | serveur gRPC du pod (threads virtuels), membres et capacités des pairs relus à chaque intervalle et à chaque heartbeat de découverte, JWT M2M `server-client` exigé ; jauge `joutio.axon.grpc.members` ; membres dans l'instantané console et `GET /internal/console/members` |
+| `AxonGrpcAutoConfiguration` | `joutio.axon.grpc.port` (8124), `.client-id` (`HOSTNAME`), `.membership-refresh` (10 s), `.capabilities-timeout` (3 s), `.capabilities-retention` (2 min), `.shutdown-grace` (10 s), `.query-timeout` (10 s) | serveur gRPC du pod (threads virtuels), membres et capacités des pairs relus à chaque intervalle et à chaque heartbeat de découverte, JWT M2M `server-client` exigé ; bus de requêtes `@Primary` (`distributedQueryBus`) ; jauges `joutio.axon.grpc.members` et `joutio.axon.subscription.active`, timer `joutio.axon.grpc.query`, compteur `joutio.axon.subscription.updates` ; membres dans l'instantané console et `GET /internal/console/members` (la console y lit les handlers de chaque application) |
 | `TrackingProcessorDefaultsAutoConfiguration` | `joutio.axon.event-availability-timeout` (5 s) | réglages communs de tous les tracking processors ; token initial en tête pour les groupes `@Saga` |
 | `InstanceScopedProcessingGroupsAutoConfiguration` | `joutio.axon.instance-scoped-groups` | subscribing processors sur une source Kafka partagée par pod : un consumer, group `<application>.<HOSTNAME>`, fin du topic, aucun offset commité, aucun token |
 | `SegmentedProcessingGroupsAutoConfiguration` + `SegmentRebalancer` | `joutio.axon.processors.<groupe>.segments`, `joutio.axon.rebalance-interval` (30 s) | groupe global segmenté, un thread par segment ; répartition des segments entre répliques découvertes ; métriques `joutio.axon.rebalancer.*` |
@@ -139,7 +139,17 @@ Release par `lib-release.yml`. Une évolution du SDK suit la chaîne :
 - `enable-accept-all-commands=false` : chaque nœud n'annonce que ses propres handlers.
 - Jauges et intercepteurs de métriques Axon : les enregistrer sur `ApplicationReadyEvent`, jamais
   pendant l'initialisation d'Axon (NPE, cycles de beans).
-- Le format du bus de requêtes n'est pas rétrocompatible : déployer de façon coordonnée.
+- Le format du bus de requêtes n'est pas rétrocompatible : déployer de façon coordonnée. Un pod resté sur l'ancien
+  SDK (bus HTTP) ne voit pas les requêtes des pods en gRPC, et inversement.
+- **Émission au commit** : `QueryUpdateEmitter.emit` dans un handler d'événement part au commit de l'unité de travail,
+  après l'écriture de la projection. Émettre hors unité de travail envoie tout de suite, avant toute écriture.
+- **Abonnement sur toutes les répliques** : un `subscriptionQuery` ouvre un flux vers chaque réplique capable et sur
+  le segment local si le pod l'est. Un handler d'abonnement coûte donc une registration par réplique et par abonné ;
+  l'émetteur garde 1 024 updates par abonné en attente de permis, au-delà l'abonnement échoue.
+- **Reactor** : `joutio-axon-grpc` apporte `reactor-core` (optionnel dans `axon-messaging`), indispensable à
+  `streamingQuery` et `subscriptionQuery`.
+- Le fournisseur d'une requête l'exécute sur le bean `localSegment` (le `SimpleQueryBus` d'Axon) : les intercepteurs
+  de handler enregistrés sur `distributedQueryBus` y sont délégués et s'appliquent aux requêtes venues des pairs.
 - **Groupes instance-scopés** : leurs handlers tournent l'un après l'autre sur le thread de l'unique
   consumer du pod. Ils restent non bloquants (envoi STOMP, appels asynchrones), sinon un handler lent
   retarde tous les groupes. Pas de DLQ ni de replay : une exception est journalisée, l'événement

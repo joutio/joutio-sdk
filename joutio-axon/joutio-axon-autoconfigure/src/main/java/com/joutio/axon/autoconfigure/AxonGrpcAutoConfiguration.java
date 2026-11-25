@@ -9,13 +9,26 @@ import com.joutio.axon.grpc.membership.Membership;
 import com.joutio.axon.grpc.membership.MembershipGrpcService;
 import com.joutio.axon.grpc.security.BearerTokenClientInterceptor;
 import com.joutio.axon.grpc.security.BearerTokenServerInterceptor;
-import com.joutio.axon.query.QueryCapabilityRegistry;
+import com.joutio.axon.autoconfigure.metrics.MicrometerQueryBusMetrics;
+import com.joutio.axon.grpc.query.EventEnvelopeModule;
+import com.joutio.axon.grpc.query.GrpcDistributedQueryBus;
+import com.joutio.axon.grpc.query.QueryBusMetrics;
+import com.joutio.axon.grpc.query.QueryCodec;
+import com.joutio.axon.grpc.query.QueryGrpcService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.grpc.ServerInterceptors;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.axonframework.commandhandling.distributed.DistributedCommandBus;
+import org.axonframework.queryhandling.DefaultQueryBusSpanFactory;
+import org.axonframework.queryhandling.QueryBus;
+import org.axonframework.queryhandling.QueryBusSpanFactory;
+import org.axonframework.serialization.RevisionResolver;
+import org.axonframework.serialization.json.JacksonSerializer;
+import org.axonframework.springboot.autoconfig.AxonAutoConfiguration;
+import org.axonframework.tracing.NoOpSpanFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -27,6 +40,7 @@ import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.cloud.client.discovery.event.HeartbeatEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -43,13 +57,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Socle du bus gRPC entre pods ({@code docs/backend/axon.md#bus-grpc-entre-pods}) : serveur gRPC du pod,
- * canaux vers les pairs, membership et sécurité M2M.
+ * Bus gRPC entre pods ({@code docs/backend/axon.md#bus-grpc-entre-pods}) : serveur gRPC du pod, canaux vers les
+ * pairs, membership, sécurité M2M et bus de requêtes ({@link GrpcDistributedQueryBus}, {@link QueryGrpcService}).
  *
- * <p>Les bus de commandes et de requêtes passent encore par HTTP : ce socle annonce et lit les capacités
- * de chaque pod, sans encore router de message.</p>
+ * <p>Le bus de commandes passe encore par axon-springcloud ({@code sdk-grpc-commandes}).</p>
  */
-@AutoConfiguration(after = AxonDistributedQueryAutoConfiguration.class)
+@AutoConfiguration(after = AxonAutoConfiguration.class)
 @EnableConfigurationProperties(AxonGrpcProperties.class)
 public class AxonGrpcAutoConfiguration {
 
@@ -71,7 +84,7 @@ public class AxonGrpcAutoConfiguration {
 
     @Bean
     public LocalCapabilities grpcLocalCapabilities(ObjectProvider<LocalCommandCapabilities> commands,
-                                                   ObjectProvider<QueryCapabilityRegistry> queries) {
+                                                   ObjectProvider<GrpcDistributedQueryBus> queries) {
         return new LocalCapabilities() {
             @Override
             public int loadFactor() {
@@ -87,8 +100,8 @@ public class AxonGrpcAutoConfiguration {
 
             @Override
             public Set<String> queryNames() {
-                QueryCapabilityRegistry registry = queries.getIfAvailable();
-                return registry == null ? Set.of() : registry.snapshot();
+                GrpcDistributedQueryBus bus = queries.getIfAvailable();
+                return bus == null ? Set.of() : bus.localQueryNames();
             }
         };
     }
@@ -138,16 +151,67 @@ public class AxonGrpcAutoConfiguration {
         return new MembershipGrpcService(localMember, localCapabilities);
     }
 
+    /**
+     * Codec du bus de requêtes : sérialiseur Jackson sur une copie de l'{@link ObjectMapper} du transport Axon
+     * (tolérant aux constantes d'énumération inconnues, {@link AxonObjectMapperAutoConfiguration}), enrichie du codec
+     * {@link EventEnvelopeModule}. Il n'est pas exposé comme {@code Serializer} : les sérialiseurs général, message et
+     * événement d'Axon (format de l'event store) restent inchangés.
+     */
+    @Bean
+    public QueryCodec grpcQueryCodec(@Qualifier(AxonObjectMapperAutoConfiguration.AXON_OBJECT_MAPPER) ObjectMapper objectMapper,
+                                     RevisionResolver revisionResolver,
+                                     LocalMember localMember) {
+        ObjectMapper queryObjectMapper = objectMapper.copy();
+        queryObjectMapper.registerModule(new EventEnvelopeModule());
+        return new QueryCodec(JacksonSerializer.builder()
+                .objectMapper(queryObjectMapper)
+                .revisionResolver(revisionResolver)
+                .build(), localMember);
+    }
+
+    @Bean
+    public QueryGrpcService grpcQueryService(@Qualifier("localSegment") QueryBus localSegment,
+                                             QueryCodec codec,
+                                             ObjectProvider<QueryBusSpanFactory> spanFactory) {
+        return new QueryGrpcService(localSegment, codec, querySpanFactory(spanFactory));
+    }
+
+    @Primary
+    @Bean("distributedQueryBus")
+    public GrpcDistributedQueryBus distributedQueryBus(@Qualifier("localSegment") QueryBus localSegment,
+                                                       Membership membership,
+                                                       PeerChannels channels,
+                                                       QueryCodec codec,
+                                                       ObjectProvider<QueryBusSpanFactory> spanFactory,
+                                                       ObjectProvider<MeterRegistry> meterRegistry,
+                                                       AxonGrpcProperties properties) {
+        QueryBusMetrics metrics = meterRegistry.getIfAvailable() == null ? QueryBusMetrics.NONE
+                : new MicrometerQueryBusMetrics(meterRegistry.getObject());
+        return new GrpcDistributedQueryBus(localSegment, membership, channels, codec, querySpanFactory(spanFactory),
+                properties.queryTimeout(), metrics);
+    }
+
     @Bean
     public GrpcServer grpcServer(AxonGrpcProperties properties,
                                  MembershipGrpcService membershipService,
+                                 QueryGrpcService queryService,
                                  BearerTokenServerInterceptor security,
                                  @Qualifier("grpcExecutor") ExecutorService executor) {
         return new GrpcServer(NettyServerBuilder.forPort(properties.port())
                 .executor(executor)
-                .addService(ServerInterceptors.intercept(membershipService, security)),
-                membershipService,
+                .addService(ServerInterceptors.intercept(membershipService, security))
+                .addService(ServerInterceptors.intercept(queryService, security)),
+                () -> {
+                    membershipService.leave();
+                    queryService.leave();
+                },
                 properties.shutdownGrace());
+    }
+
+    private static QueryBusSpanFactory querySpanFactory(ObjectProvider<QueryBusSpanFactory> spanFactory) {
+        return spanFactory.getIfAvailable(() -> DefaultQueryBusSpanFactory.builder()
+                .spanFactory(NoOpSpanFactory.INSTANCE)
+                .build());
     }
 
     @Bean
@@ -177,13 +241,24 @@ public class AxonGrpcAutoConfiguration {
         return event -> membership.refreshSoon();
     }
 
-    /** Jauge enregistrée une fois l'application prête, jamais pendant l'initialisation d'Axon. */
+    /** Jauges enregistrées une fois l'application prête, jamais pendant l'initialisation d'Axon. */
     @Bean
     public ApplicationListener<ApplicationReadyEvent> grpcMembershipMetrics(Membership membership,
+                                                                           GrpcDistributedQueryBus queryBus,
+                                                                           QueryGrpcService queryService,
                                                                            ObjectProvider<MeterRegistry> registry) {
-        return event -> registry.ifAvailable(meters -> Gauge.builder("joutio.axon.grpc.members",
-                        membership, current -> current.topology().members().size())
-                .description("Membres du bus gRPC vus par ce pod")
-                .register(meters));
+        return event -> registry.ifAvailable(meters -> {
+            Gauge.builder("joutio.axon.grpc.members", membership, current -> current.topology().members().size())
+                    .description("Membres du bus gRPC vus par ce pod")
+                    .register(meters);
+            Gauge.builder("joutio.axon.subscription.active", queryBus, GrpcDistributedQueryBus::activeSubscriptions)
+                    .description("Abonnements de requêtes ouverts par ce pod")
+                    .tag("role", "subscriber")
+                    .register(meters);
+            Gauge.builder("joutio.axon.subscription.active", queryService, QueryGrpcService::activeSubscriptions)
+                    .description("Abonnements de requêtes servis par ce pod")
+                    .tag("role", "provider")
+                    .register(meters);
+        });
     }
 }
